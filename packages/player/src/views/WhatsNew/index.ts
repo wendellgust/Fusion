@@ -1,1 +1,0 @@
-export { WhatsNew } from './WhatsNew';

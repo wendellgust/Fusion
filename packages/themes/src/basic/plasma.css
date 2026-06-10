@@ -1,0 +1,17 @@
+:root[data-theme-id='nuclear:plasma'] {
+  --background: oklch(0.97 0.015 310);
+  --primary: oklch(0.72 0.18 320);
+  --foreground-secondary: oklch(0.4 0.12 315);
+}
+
+:root[data-theme-id='nuclear:plasma'][data-theme='dark'] {
+  --background: oklch(0.18 0.03 300);
+  --background-secondary: oklch(0.23 0.04 300);
+  --background-input: oklch(0.13 0.02 300);
+  --primary: oklch(0.7 0.22 320);
+  --foreground: oklch(0.93 0.01 300);
+  --foreground-secondary: oklch(0.8 0.1 315);
+  --border: oklch(0.45 0.05 300);
+  --accent-purple: oklch(0.72 0.16 300);
+  --accent-blue: oklch(0.75 0.15 250);
+}

@@ -4,7 +4,6 @@ import {
   PaletteIcon,
   ScrollTextIcon,
   Settings2Icon,
-  SparklesIcon,
 } from 'lucide-react';
 import { FC } from 'react';
 
@@ -20,8 +19,6 @@ import { Logs } from '../views/Logs/Logs';
 import { Plugins } from '../views/Plugins/Plugins';
 import { Settings } from '../views/Settings/Settings';
 import { Themes } from '../views/Themes/Themes';
-import { WhatsNew } from '../views/WhatsNew';
-import { SocialLinks } from './SocialLinks';
 import { VersionString } from './VersionString';
 
 const SETTINGS_TABS = [
@@ -50,11 +47,6 @@ const SETTINGS_TABS = [
     icon: <ScrollTextIcon />,
     content: () => <Logs />,
   },
-  {
-    id: 'whats-new',
-    icon: <SparklesIcon />,
-    content: () => <WhatsNew />,
-  },
 ] as const;
 
 export const ConnectedSettingsModal: FC = () => {
@@ -75,7 +67,6 @@ export const ConnectedSettingsModal: FC = () => {
       onTabChange={(tabId) => setActiveTab(tabId as SettingsTab)}
       navFooter={
         <div className="flex flex-col items-center gap-2">
-          <SocialLinks />
           <VersionString />
         </div>
       }

@@ -5,8 +5,7 @@ export type SettingsTab =
   | 'shortcuts'
   | 'plugins'
   | 'themes'
-  | 'logs'
-  | 'whats-new';
+  | 'logs';
 
 type SettingsModalState = {
   isOpen: boolean;

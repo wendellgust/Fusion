@@ -1,9 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Nuclear",
+  "productName": "Fusion",
   "mainBinaryName": "nuclear-music-player",
   "version": "1.39.1",
-  "identifier": "com.nuclearplayer",
+  "identifier": "com.fusionplayer",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -13,7 +13,7 @@
   "app": {
     "windows": [
       {
-        "title": "Nuclear Music Player",
+        "title": "Fusion Music Player",
         "width": 800,
         "height": 600,
         "resizable": true,
@@ -28,11 +28,11 @@
   "bundle": {
     "active": true,
     "category": "Music",
-    "shortDescription": "Music streaming app for your desktop",
-    "longDescription": "Nuclear is a free, open-source music player without ads or tracking. Search for any song or artist, build playlists, and start listening.",
+    "shortDescription": "Personal music streaming app",
+    "longDescription": "Fusion is a personal build of the Nuclear music player. Free, open-source, no ads or tracking.",
     "copyright": "Copyright 2025-2026 nukeop",
     "homepage": "https://nuclearplayer.com",
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "targets": "all",
     "icon": [
       "icons/icon.png",

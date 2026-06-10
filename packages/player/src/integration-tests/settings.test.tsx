@@ -128,7 +128,7 @@ describe('Settings integration', () => {
     const toggle = await screen.findByRole('switch', { name: 'Toggle theme' });
     await userEvent.click(toggle);
 
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(document.documentElement.getAttribute('data-theme')).toBeNull();
 
     // Simulate player restart
     cleanup();
@@ -141,8 +141,8 @@ describe('Settings integration', () => {
     await waitFor(() => {
       expect(
         screen.getByRole('switch', { name: 'Toggle theme' }),
-      ).toHaveAttribute('aria-checked', 'true');
-      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      ).toHaveAttribute('aria-checked', 'false');
+      expect(document.documentElement.getAttribute('data-theme')).toBeNull();
     });
   });
 });

@@ -38,7 +38,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     description: 'preferences.theme.active.id.description',
     category: 'appearance',
     kind: 'string',
-    default: '',
+    default: 'nuclear:plasma',
     hidden: true,
     widget: { type: 'text' },
   },
@@ -48,7 +48,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     description: 'preferences.theme.dark.description',
     category: 'appearance',
     kind: 'boolean',
-    default: false,
+    default: true,
     hidden: true,
     widget: { type: 'toggle' },
   },
@@ -58,7 +58,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     description: 'preferences.playback.volume.description',
     category: 'playback',
     kind: 'number',
-    default: 1,
+    default: 0.7,
     hidden: true,
     widget: { type: 'slider', min: 0, max: 1, step: 0.01 },
   },
@@ -133,7 +133,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     description: 'preferences.playback.crossfadeMs.description',
     category: 'playback',
     kind: 'number',
-    default: 0,
+    default: 500,
     widget: { type: 'number-input', min: 0, max: 5000, step: 50, unit: 'ms' },
   },
   {
@@ -187,7 +187,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     category: 'general',
     kind: 'enum',
     options: LANGUAGE_OPTIONS,
-    default: 'en_US',
+    default: 'pt_BR',
     widget: { type: 'select' },
   },
   {
@@ -196,7 +196,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     description: 'preferences.updates.checkForUpdates.description',
     category: 'updates',
     kind: 'boolean',
-    default: true,
+    default: false,
     widget: { type: 'toggle' },
   },
   {
@@ -251,6 +251,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     category: 'integrations',
     kind: 'boolean',
     default: false,
+    hidden: true,
     widget: { type: 'toggle' },
   },
   {
@@ -260,6 +261,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     category: 'integrations',
     kind: 'string',
     default: 'http://127.0.0.1:8800/mcp',
+    hidden: true,
     widget: { type: 'info' },
   },
   {
@@ -269,6 +271,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     category: 'integrations',
     kind: 'boolean',
     default: false,
+    hidden: true,
     widget: { type: 'toggle' },
   },
   {
@@ -278,6 +281,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     category: 'integrations',
     kind: 'string',
     default: 'mpd://127.0.0.1:6600',
+    hidden: true,
     widget: { type: 'info' },
   },
   {
@@ -287,6 +291,7 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     category: 'integrations',
     kind: 'boolean',
     default: false,
+    hidden: true,
     widget: { type: 'toggle' },
   },
 ];

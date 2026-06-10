@@ -16,6 +16,7 @@ import './basic/aurora.css';
 import './basic/ember.css';
 import './basic/lagoon.css';
 import './basic/arctic-moss.css';
+import './basic/plasma.css';
 
 export type BasicThemeMeta = {
   id: string;
@@ -72,6 +73,16 @@ const BUILT_INS: BasicThemeMeta[] = [
       'oklch(0.97 0.008 200)',
       'oklch(0.58 0.09 175)',
       'oklch(0.20 0.02 175)',
+    ],
+  },
+  {
+    id: 'nuclear:plasma',
+    name: 'Plasma',
+    palette: [
+      'oklch(0.70 0.22 320)',
+      'oklch(0.97 0.015 310)',
+      'oklch(0.40 0.12 315)',
+      'oklch(0.18 0.03 300)',
     ],
   },
 ];
