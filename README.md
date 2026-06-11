@@ -1,8 +1,38 @@
 # Fusion (Nuclear Fork)
 
-This project is a modified fork of Nuclear. It keeps the original AGPL-3.0 license and includes changes to playback, UI, browser cookie extraction (supporting Floorp), and an Internet Radio streaming feature.
+This project is a modified fork of Nuclear. It keeps the original AGPL-3.0 license and includes custom features for playback control, moderation, productivity, and UI.
 
 Based on Nuclear, originally licensed under the GNU Affero General Public License v3.0. Modified in 2026.
+
+## What's Different in Fusion?
+
+Fusion adds several productivity, moderation, and personalization features to the standard Nuclear player:
+
+### 1. Pomodoro Timer ⏱️
+* **Where to find it**: Located at the bottom of the left sidebar.
+* **How to use**: Click the timer to start or pause. Click the reset icon to start over. Use the settings gear icon to customize work and break intervals, toggle ticking/chime sound effects, and choose preset times.
+
+### 2. Listening Recap & Analytics 📊
+* **Where to find it**: Click **Recap & Filters** in the left sidebar.
+* **How to use**: Displays detailed statistics of your listening habits:
+  * Total plays and total listening time.
+  * Your top 5 artists and top 5 tracks.
+  * Hourly routines (Morning vs Night) and weekly listening trends.
+  * Scrollable list of recent plays with a "Clear History" button.
+
+### 3. Artist & Genre Blocklist Filters 🚫
+* **Where to find & use**:
+  * **On Artist Pages**: Click the `Ban` icon next to the Favorite heart button to block or unblock that artist.
+  * **On Recap & Filters**: Go to the *Artist & Genre Filters* tab. Type any artist or style/genre name to block them manually.
+* **Behavior**: Any queued track featuring a blocked artist or containing a blocked genre/tag is automatically skipped during playback.
+
+### 4. Improved Presets & Browser Support 🌐
+* Pre-configured with high-uptime HTTPS radio servers to avoid mixed-content web view blocks.
+* Playlists can be imported using your local Floorp browser cookies configuration.
+
+### 5. Custom Theme & Branding 🎨
+* Rebranded application window, app logo, and launcher name to **Fusion**.
+* Comes with the custom **Plasma** theme (violet/magenta palette) enabled as the default dark mode theme.
 
 ## Screenshots
 
