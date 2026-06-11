@@ -1,6 +1,6 @@
 # Fusion (Nuclear Fork)
 
-This project is a modified fork of Nuclear. It keeps the original AGPL-3.0 license and includes custom features for playback control, moderation, productivity, and UI.
+This project is a customized, modified fork of Nuclear. I originally built these custom features (like the Pomodoro timer, listening statistics recap, and artist/genre blocks) for my own personal use, and decided to make the repository public under the original AGPL-3.0 license so others can use and enjoy them too.
 
 Based on Nuclear, originally licensed under the GNU Affero General Public License v3.0. Modified in 2026.
 
