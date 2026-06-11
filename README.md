@@ -35,15 +35,27 @@ Nuclear comes with multiple built-in themes:
 | ![What's new](packages/docs/.gitbook/assets/whats-new.png) | ![Log viewer](packages/docs/.gitbook/assets/log-viewer.png) |
 | What's new | Log viewer |
 
-## Download
+## Running and Building Fusion
 
-Grab the latest release for your platform from the [Releases page](https://github.com/nukeop/nuclear/releases).
+Since Fusion is a custom personal fork of Nuclear, you can build and run it from source.
 
-| Platform | Formats |
-|----------|---------|
-| Windows | `.exe` installer, `.msi` |
-| macOS | `.dmg` (Apple Silicon and Intel) |
-| Linux | `.AppImage`, `.deb`, `.rpm`, `.flatpak` |
+### Prerequisites
+Make sure you have [Node.js](https://nodejs.org/), [PNPM](https://pnpm.io/), and [Rust/Cargo](https://www.rust-lang.org/) installed.
+
+### Build Instructions
+1. Install project dependencies:
+   ```bash
+   npx pnpm install
+   ```
+2. Build the application:
+   ```bash
+   npx pnpm build
+   ```
+Once completed, the compiled binary will be available in:
+`packages/player/src-tauri/target/release/nuclear-music-player`
+
+### Official Upstream Releases
+If you are looking for the original, unmodified, and official pre-built releases of Nuclear, please visit the [Official Nuclear Releases Page](https://github.com/nukeop/nuclear/releases).
 
 ## Features
 
