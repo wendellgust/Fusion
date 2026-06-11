@@ -5,8 +5,10 @@ import {
   GaugeIcon,
   ListMusicIcon,
   MusicIcon,
+  Radio,
   SettingsIcon,
   UserIcon,
+  BarChart3,
 } from 'lucide-react';
 
 import { useTranslation } from '@nuclearplayer/i18n';
@@ -30,6 +32,7 @@ import { DevTools } from '../components/DevTools';
 import { FlatpakWarningBanner } from '../components/FlatpakWarningBanner';
 import { SoundProvider } from '../components/SoundProvider';
 import { StreamResolver } from '../components/StreamResolver';
+import { PomodoroTimer } from '../components/PomodoroTimer';
 import { GlobalShortcuts } from '../shortcuts';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useSettingsModalStore } from '../stores/settingsModalStore';
@@ -73,6 +76,11 @@ const RootComponent = () => {
                   label={t('dashboard')}
                 />
                 <SidebarNavigationItem
+                  to="/stats"
+                  icon={<BarChart3 />}
+                  label="Recap & Filters"
+                />
+                <SidebarNavigationItem
                   to="/favorites/albums"
                   icon={<DiscIcon />}
                   label={t('favoriteAlbums')}
@@ -93,11 +101,17 @@ const RootComponent = () => {
                   label={t('playlists')}
                 />
                 <SidebarNavigationItem
+                  to="/radio"
+                  icon={<Radio />}
+                  label={t('radio')}
+                />
+                <SidebarNavigationItem
                   to="/sources"
                   icon={<CableIcon />}
                   label={t('sources')}
                 />
               </div>
+              <PomodoroTimer isCompact={leftSidebar.isCollapsed} />
               <SidebarNavigationItem
                 icon={<SettingsIcon />}
                 label={tPrefs('title')}

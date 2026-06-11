@@ -1,3 +1,4 @@
+pub mod audio;
 pub mod bridge;
 pub mod commands;
 pub mod discord;
@@ -56,6 +57,7 @@ pub fn run() {
             ytdlp::ytdlp_search,
             ytdlp::ytdlp_get_stream,
             ytdlp::ytdlp_get_playlist,
+            ytdlp::ytdlp_set_cookies,
             logging::get_startup_logs,
             mcp::mcp_start,
             mcp::mcp_stop,
@@ -70,7 +72,11 @@ pub fn run() {
             discord::discord_set_activity,
             discord::discord_clear_activity,
             bridge::bridge_respond,
-            bridge::bridge_notify
+            bridge::bridge_notify,
+            audio::audio_list_sinks,
+            audio::audio_set_default_sink,
+            audio::audio_get_bluetooth,
+            audio::audio_set_card_profile
         ])
         .setup(|app| {
             logging::mark_startup_complete();

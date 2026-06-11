@@ -5,6 +5,7 @@ use tauri::command;
 
 static YTDLP_PATH: RwLock<Option<String>> = RwLock::new(None);
 
+
 pub fn set_ytdlp_path(path: String) {
     if let Ok(mut guard) = YTDLP_PATH.write() {
         debug!("[yt-dlp] Binary path set to: {}", path);
@@ -82,9 +83,13 @@ struct YtdlpJson {
     channel: Option<String>,
 }
 
+
 fn run_ytdlp(args: &[&str]) -> Result<String, String> {
     let program = get_ytdlp_path()?;
     let mut cmd = Command::new(&program);
+
+
+
     cmd.args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -108,6 +113,11 @@ fn run_ytdlp(args: &[&str]) -> Result<String, String> {
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+#[command]
+pub fn ytdlp_set_cookies(_cookies_file: Option<String>) {
+    // No-op
 }
 
 fn parse_ndjson_entries(stdout: &str) -> Vec<YtdlpJson> {

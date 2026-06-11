@@ -2,6 +2,20 @@ import { usePlaylistStore } from '../stores/playlistStore';
 import { PlaylistBuilder } from '../test/builders/PlaylistBuilder';
 import { ConnectedTrackContextMenuWrapper as Wrapper } from './ConnectedTrackContextMenu.test-wrapper';
 
+const mockPlayNow = vi.fn();
+const mockAddNext = vi.fn();
+const mockAddToQueue = vi.fn();
+
+vi.mock('../hooks/useTrackActions', () => ({
+  useTrackActions: () => ({
+    playNow: mockPlayNow,
+    addNext: mockAddNext,
+    addToQueue: mockAddToQueue,
+    toggleFavorite: vi.fn(),
+    isFavorite: () => false,
+  }),
+}));
+
 vi.mock(
   '../services/playlistFileService',
   async () =>
@@ -10,10 +24,34 @@ vi.mock(
 
 describe('ConnectedTrackContextMenu', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     usePlaylistStore.setState({
       index: [],
       playlists: new Map(),
       loaded: true,
+    });
+  });
+
+  describe('track actions', () => {
+    it('calls playNow when play now option is clicked', async () => {
+      Wrapper.mount();
+      await Wrapper.open();
+      await Wrapper.action('Play now').click();
+      expect(mockPlayNow).toHaveBeenCalled();
+    });
+
+    it('calls addNext when play next option is clicked', async () => {
+      Wrapper.mount();
+      await Wrapper.open();
+      await Wrapper.action('Play next').click();
+      expect(mockAddNext).toHaveBeenCalled();
+    });
+
+    it('calls addToQueue when add to queue option is clicked', async () => {
+      Wrapper.mount();
+      await Wrapper.open();
+      await Wrapper.action('Add to queue').click();
+      expect(mockAddToQueue).toHaveBeenCalled();
     });
   });
 

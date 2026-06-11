@@ -1,12 +1,14 @@
 import isEmpty from 'lodash-es/isEmpty';
 import { FC } from 'react';
+import { Ban } from 'lucide-react';
 
 import { useTranslation } from '@nuclearplayer/i18n';
 import { pickArtwork } from '@nuclearplayer/model';
-import { Loader } from '@nuclearplayer/ui';
+import { Loader, Button } from '@nuclearplayer/ui';
 
 import { ConnectedFavoriteButton } from '../../../components/ConnectedFavoriteButton';
 import { useArtistBio } from '../hooks/useArtistBio';
+import { useBlockStore } from '../../../stores/blockStore';
 
 const AVATAR_SIZE_PX = 300;
 
@@ -25,6 +27,19 @@ export const ArtistBioHeader: FC<ArtistBioHeaderProps> = ({
     isLoading,
     isError,
   } = useArtistBio(providerId, artistId);
+
+  const isBlocked = useBlockStore((state) =>
+    artist ? state.isArtistBlocked(artist.name) : false,
+  );
+
+  const toggleBlock = async () => {
+    if (!artist) return;
+    if (isBlocked) {
+      await useBlockStore.getState().removeBlockedArtist(artist.name);
+    } else {
+      await useBlockStore.getState().addBlockedArtist(artist.name);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -51,13 +66,31 @@ export const ArtistBioHeader: FC<ArtistBioHeaderProps> = ({
 
   return (
     <div className="border-border bg-primary shadow-shadow relative m-4 rounded-md border-(length:--border-width) p-6">
-      <ConnectedFavoriteButton
-        type="artist"
-        source={{ provider: providerId, id: artistId }}
-        data={{ name: artist.name, artwork: artist.artwork }}
-        className="bg-background border-border absolute top-4 right-4 z-10 rounded-md border-(length:--border-width)"
-        data-testid="artist-favorite-button"
-      />
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+        <Button
+          size="icon"
+          variant="text"
+          className="bg-background border-border rounded-md border-(length:--border-width)"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleBlock();
+          }}
+          title={isBlocked ? 'Unblock Artist' : 'Block Artist'}
+          data-testid="artist-block-button"
+        >
+          <Ban
+            size={24}
+            className={isBlocked ? 'text-accent-red fill-accent-red/20' : 'text-foreground-secondary hover:text-foreground'}
+          />
+        </Button>
+        <ConnectedFavoriteButton
+          type="artist"
+          source={{ provider: providerId, id: artistId }}
+          data={{ name: artist.name, artwork: artist.artwork }}
+          className="bg-background border-border rounded-md border-(length:--border-width)"
+          data-testid="artist-favorite-button"
+        />
+      </div>
       <div className="flex gap-6">
         <div className="flex flex-1 flex-col gap-4">
           <div className="flex items-center gap-5">

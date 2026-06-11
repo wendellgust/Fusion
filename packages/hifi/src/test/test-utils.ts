@@ -16,7 +16,7 @@ export const setupAudioContextMock = () => {
   } as unknown as AudioDestinationNode;
   const fakeCtx = {
     currentTime: 0,
-    resume: vi.fn(),
+    resume: vi.fn().mockResolvedValue(undefined),
     close: vi.fn(),
     createMediaElementSource: () => ({
       connect: vi.fn(),

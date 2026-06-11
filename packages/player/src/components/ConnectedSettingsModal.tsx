@@ -1,4 +1,5 @@
 import {
+  AudioLinesIcon,
   BlocksIcon,
   KeyboardIcon,
   PaletteIcon,
@@ -14,6 +15,7 @@ import {
   useSettingsModalStore,
   type SettingsTab,
 } from '../stores/settingsModalStore';
+import { AudioDiagnostics } from '../views/AudioDiagnostics';
 import { KeyboardShortcuts } from '../views/KeyboardShortcuts';
 import { Logs } from '../views/Logs/Logs';
 import { Plugins } from '../views/Plugins/Plugins';
@@ -41,6 +43,11 @@ const SETTINGS_TABS = [
     id: 'themes',
     icon: <PaletteIcon />,
     content: () => <Themes />,
+  },
+  {
+    id: 'audio',
+    icon: <AudioLinesIcon />,
+    content: () => <AudioDiagnostics />,
   },
   {
     id: 'logs',

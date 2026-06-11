@@ -141,3 +141,12 @@ const getObjectPreview = (obj: object): string => {
     return '[unable to preview]';
   }
 };
+
+if (typeof window !== 'undefined') {
+  (window as any).__AUDIO_LOG__ = (
+    level: 'trace' | 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+  ) => {
+    Logger.playback[level](message);
+  };
+}

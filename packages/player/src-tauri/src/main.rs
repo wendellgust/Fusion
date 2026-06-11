@@ -58,4 +58,25 @@ fn apply_linux_workarounds() {
             std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
         }
     }
+    // Fix for Bluetooth A2DP audio cut-out/silence issues in WebKit/GStreamer.
+    // Setting PULSE_LATENCY_MSEC to 200 forces PulseAudio/pipewire-pulse to use
+    // a buffer size large enough for the bluetooth latency (~150-250ms),
+    // preventing the pulsesink ring buffer from underrunning and going silent.
+    if std::env::var("PULSE_LATENCY_MSEC").is_err() {
+        unsafe {
+            std::env::set_var("PULSE_LATENCY_MSEC", "200");
+        }
+    }
+    // Also set PIPEWIRE_LATENCY and PIPEWIRE_QUANTUM in case GStreamer uses the native
+    // pipewiresink instead of pulsesink.
+    if std::env::var("PIPEWIRE_LATENCY").is_err() {
+        unsafe {
+            std::env::set_var("PIPEWIRE_LATENCY", "8192/48000");
+        }
+    }
+    if std::env::var("PIPEWIRE_QUANTUM").is_err() {
+        unsafe {
+            std::env::set_var("PIPEWIRE_QUANTUM", "8192/48000");
+        }
+    }
 }

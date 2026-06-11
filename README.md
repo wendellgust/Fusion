@@ -1,26 +1,11 @@
-<p align="center">
-  <picture>
-    <source alt="Nuclear Music Player"  srcset="packages/docs/.gitbook/assets/readme-banner.png">
-    <img alt="Nuclear Music Player"  srcset="packages/docs/.gitbook/assets/readme-banner.png">
-  </picture>
+# Fusion (Nuclear Fork)
 
+This project is a modified fork of Nuclear. It keeps the original AGPL-3.0 license and includes changes to playback, UI, browser cookie extraction (supporting Floorp), and an Internet Radio streaming feature.
 
-</p>
-
-<div align="center">
-
-# Nuclear 
-
-</div>
-
-<div align="center">
-
-  Nuclear is a free, open-source music player without ads or tracking. Search for any song or artist, build playlists, and start listening.<br>
-  Runs on Windows, macOS, and Linux.
-  
-</div>
+Based on Nuclear, originally licensed under the GNU Affero General Public License v3.0. Modified in 2026.
 
 ## Screenshots
+
 
 <p align="center">
   <img src="packages/docs/.gitbook/assets/dashboard-main.png" alt="Nuclear Music Player - Dashboard" width="100%">

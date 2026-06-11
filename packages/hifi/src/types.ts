@@ -21,4 +21,5 @@ export type SoundProps = {
   onCanPlay?: () => void;
   onError?: (error: Error) => void;
   children?: ReactNode;
+  bypassWebAudio?: boolean;
 };

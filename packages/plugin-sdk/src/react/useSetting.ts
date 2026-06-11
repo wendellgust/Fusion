@@ -6,7 +6,12 @@ export const useSetting = <T extends SettingValue = SettingValue>(
   host: SettingsHost | undefined,
   id: string,
 ) => {
-  const [currentValue, setCurrentValue] = useState<T | undefined>(undefined);
+  const [currentValue, setCurrentValue] = useState<T | undefined>(() => {
+    if (host && typeof host.getSync === 'function') {
+      return host.getSync<T>(id);
+    }
+    return undefined;
+  });
 
   useEffect(() => {
     if (!host) {

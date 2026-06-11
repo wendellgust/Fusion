@@ -5,6 +5,7 @@ export type SettingsTab =
   | 'shortcuts'
   | 'plugins'
   | 'themes'
+  | 'audio'
   | 'logs';
 
 type SettingsModalState = {

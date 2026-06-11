@@ -299,6 +299,9 @@
           "description": "Point your AI tool to this URL to connect to Nuclear."
         }
       }
+    },
+    "audio": {
+      "title": "Áudio"
     }
   },
   "queue": {

@@ -153,6 +153,9 @@ export type SettingsHost = {
   get<T extends SettingValue = SettingValue>(
     id: string,
   ): Promise<T | undefined>;
+  getSync?<T extends SettingValue = SettingValue>(
+    id: string,
+  ): T | undefined;
   set<T extends SettingValue = SettingValue>(
     id: string,
     value: T,

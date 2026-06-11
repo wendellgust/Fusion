@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export interface LayoutState {
   leftSidebar: {
@@ -15,6 +15,19 @@ export interface LayoutState {
   setLeftSidebarWidth: (width: number) => void;
   setRightSidebarWidth: (width: number) => void;
 }
+
+const dummyStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
+const safeStorage = createJSONStorage(() => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    return window.localStorage;
+  }
+  return dummyStorage;
+});
 
 export const useLayoutStore = create<LayoutState>()(
   persist(
@@ -58,6 +71,7 @@ export const useLayoutStore = create<LayoutState>()(
     }),
     {
       name: 'nuclear-layout-store',
+      storage: safeStorage,
     },
   ),
 );

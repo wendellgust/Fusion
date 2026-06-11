@@ -18,13 +18,20 @@ import { initMcpHandler } from './services/mcp';
 import { initMpdHandler } from './services/mpd';
 import { hydratePluginsFromRegistry } from './services/plugins/pluginBootstrap';
 import { ytdlpEnsureInstalled } from './services/tauri/commands';
+import {
+  applyYtdlpSettingsFromStore,
+  initYtdlpSettingsWatcher,
+} from './services/ytdlpService';
 import { initializeFavoritesStore } from './stores/favoritesStore';
 import { initializePlaylistStore } from './stores/playlistStore';
 import { initializeQueueStore } from './stores/queueStore';
+import { initializeRadioStore } from './stores/radioStore';
 import { initializeSettingsStore } from './stores/settingsStore';
 import { initializeShortcutsStore } from './stores/shortcutsStore';
 import { hydrateThemeStore } from './stores/themeStore';
 import { useUpdaterStore } from './stores/updaterStore';
+import { initializeBlockStore } from './stores/blockStore';
+import { initializeStatsStore } from './stores/statsStore';
 
 export const initPlayerApp = async (
   root: ReturnType<typeof import('react-dom/client').createRoot>,
@@ -34,8 +41,11 @@ export const initPlayerApp = async (
   await initializeSettingsStore()
     .then(() => initializeShortcutsStore())
     .then(() => initializeQueueStore())
+    .then(() => initializeBlockStore())
+    .then(() => initializeStatsStore())
     .then(() => initializeFavoritesStore())
     .then(() => initializePlaylistStore())
+    .then(() => initializeRadioStore())
     .then(() => registerBuiltInCoreSettings())
     .then(() => initDiscoveryService())
     .then(() => initMcpHandler())
@@ -45,6 +55,8 @@ export const initPlayerApp = async (
     .then(() => initDiscordHandler())
     .then(() => applyLanguageFromSettings())
     .then(() => initLanguageWatcher())
+    .then(() => applyYtdlpSettingsFromStore())
+    .then(() => initYtdlpSettingsWatcher())
     .then(() => startAdvancedThemeWatcher())
     .then(() => loadMarketplaceThemes())
     .then(() => hydrateThemeStore())

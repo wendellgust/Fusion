@@ -128,6 +128,15 @@ export const CORE_SETTINGS: SettingDefinition[] = [
     widget: { type: 'number-input', min: 1, max: 60, step: 1, unit: 's' },
   },
   {
+    id: 'playback.bypassWebAudio',
+    title: 'preferences.playback.bypassWebAudio.title',
+    description: 'preferences.playback.bypassWebAudio.description',
+    category: 'playback',
+    kind: 'boolean',
+    default: false,
+    widget: { type: 'toggle' },
+  },
+  {
     id: 'playback.crossfadeMs',
     title: 'preferences.playback.crossfadeMs.title',
     description: 'preferences.playback.crossfadeMs.description',

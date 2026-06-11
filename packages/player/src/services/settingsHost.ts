@@ -46,6 +46,13 @@ export const createPluginSettingsHost = (
         .getValue(fullyQualifiedId);
       return currentValue as T | undefined;
     },
+    getSync: <T extends SettingValue = SettingValue>(id: string) => {
+      const fullyQualifiedId = normalizeId(pluginSource, id);
+      const currentValue = useSettingsStore
+        .getState()
+        .getValue(fullyQualifiedId);
+      return currentValue as T | undefined;
+    },
     set: async (id: string, value: SettingValue) => {
       const fullyQualifiedId = normalizeId(pluginSource, id);
       await useSettingsStore.getState().setValue(fullyQualifiedId, value);
@@ -82,6 +89,13 @@ export const createCoreSettingsHost = (): SettingsHost => {
       return { registered: registeredIds };
     },
     get: async <T extends SettingValue = SettingValue>(id: string) => {
+      const fullyQualifiedId = normalizeId(coreSource, id);
+      const currentValue = useSettingsStore
+        .getState()
+        .getValue(fullyQualifiedId);
+      return currentValue as T | undefined;
+    },
+    getSync: <T extends SettingValue = SettingValue>(id: string) => {
       const fullyQualifiedId = normalizeId(coreSource, id);
       const currentValue = useSettingsStore
         .getState()

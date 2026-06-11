@@ -18,6 +18,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   const [volume01] = useCoreSetting<number>('playback.volume');
   const [muted] = useCoreSetting<boolean>('playback.muted');
   const volumePercent = muted ? 0 : Math.round((volume01 ?? 1) * 100);
+  const [bypassWebAudio] = useCoreSetting<boolean>('playback.bypassWebAudio');
 
   useEffect(() => {
     if (crossfadeMs !== undefined) {
@@ -77,6 +78,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
           onEnd={handleEnd}
           onCanPlay={handleCanPlay}
           onError={handleError}
+          bypassWebAudio={bypassWebAudio}
         >
           <Volume value={volumePercent} />
         </Sound>

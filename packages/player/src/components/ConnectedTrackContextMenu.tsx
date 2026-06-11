@@ -1,5 +1,6 @@
-import { Heart, ListEnd, ListMusicIcon, ListStart, Play } from 'lucide-react';
-import { FC, ReactNode } from 'react';
+import { Heart, ListEnd, ListMusicIcon, ListStart, Play, Sparkles } from 'lucide-react';
+import { FC, ReactNode, useState } from 'react';
+import { SimilarTracksDialog } from './SimilarTracksDialog';
 
 import { useTranslation } from '@nuclearplayer/i18n';
 import { pickArtwork, Track } from '@nuclearplayer/model';
@@ -21,6 +22,7 @@ export const ConnectedTrackContextMenu: FC<ConnectedTrackContextMenuProps> = ({
   const { t: tPlaylists } = useTranslation('playlists');
   const trackActions = useTrackActions();
   const playlistSubmenu = usePlaylistSubmenu();
+  const [isSimilarDialogOpen, setIsSimilarDialogOpen] = useState(false);
 
   const isFavorite = trackActions.isFavorite(track);
   const thumbnail = pickArtwork(track.artwork, 'thumbnail', 64)?.url;
@@ -61,6 +63,12 @@ export const ConnectedTrackContextMenu: FC<ConnectedTrackContextMenuProps> = ({
             ? t('actions.removeFromFavorites')
             : t('actions.addToFavorites')}
         </TrackContextMenu.Action>
+        <TrackContextMenu.Action
+          icon={<Sparkles size={16} />}
+          onClick={() => setIsSimilarDialogOpen(true)}
+        >
+          Similar Songs
+        </TrackContextMenu.Action>
         {playlistSubmenu.hasPlaylists && (
           <TrackContextMenu.Submenu>
             <TrackContextMenu.Submenu.Trigger
@@ -96,6 +104,11 @@ export const ConnectedTrackContextMenu: FC<ConnectedTrackContextMenuProps> = ({
           </TrackContextMenu.Submenu>
         )}
       </TrackContextMenu.Content>
+      <SimilarTracksDialog
+        track={track}
+        isOpen={isSimilarDialogOpen}
+        onClose={() => setIsSimilarDialogOpen(false)}
+      />
     </TrackContextMenu>
   );
 };

@@ -33,7 +33,8 @@
     "favoriteTracks": "Favorite tracks",
     "favoriteArtists": "Favorite artists",
     "playlists": "Playlists",
-    "sources": "Sources"
+    "sources": "Sources",
+    "radio": "Internet Radio"
   },
   "sources": {
     "title": "Sources",
@@ -325,6 +326,10 @@
         "title": "Skip duration",
         "description": "Number of seconds to skip forward/backward"
       },
+      "bypassWebAudio": {
+        "title": "Bypass Web Audio (fixes Linux Bluetooth A2DP)",
+        "description": "Bypasses the Web Audio graph and plays directly to the system sound server to prevent Bluetooth stutter and silence."
+      },
       "crossfadeMs": {
         "title": "Crossfade",
         "description": "Crossfade duration between tracks in milliseconds"
@@ -400,6 +405,9 @@
           "description": "Show what you're listening to on your Discord profile."
         }
       }
+    },
+    "audio": {
+      "title": "Audio"
     }
   },
   "queue": {
@@ -493,5 +501,18 @@
       "plugin": "Plugin",
       "docs": "Docs"
     }
+  },
+  "radio": {
+    "title": "Internet Radio",
+    "subtitle": "Stream your favorite custom radio stations",
+    "addStation": "Add custom station",
+    "editStation": "Edit radio station",
+    "stationName": "Station Name",
+    "stationUrl": "Streaming URL",
+    "urlPlaceholder": "http://...",
+    "noStations": "No radio stations found",
+    "noStationsSubtitle": "Add a streaming URL to start listening to internet radio",
+    "deleteConfirm": "Are you sure you want to delete this station?",
+    "delete": "Delete station"
   }
 }

@@ -12,11 +12,7 @@ pub fn log_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
         ])
         .max_file_size(MAX_LOG_FILE_SIZE)
         .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(MAX_LOG_FILES))
-        .level(if cfg!(debug_assertions) {
-            log::LevelFilter::Debug
-        } else {
-            log::LevelFilter::Info
-        })
+        .level(log::LevelFilter::Debug)
         .format(|callback, message, record| {
             logging::capture_startup_log(record.level(), &message.to_string());
             callback.finish(format_args!(

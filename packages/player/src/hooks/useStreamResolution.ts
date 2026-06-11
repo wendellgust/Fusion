@@ -7,6 +7,7 @@ import { useTranslation } from '@nuclearplayer/i18n';
 import type { QueueItem, StreamCandidate, Track } from '@nuclearplayer/model';
 
 import { streamingHost } from '../services/streamingHost';
+import { useBlockStore } from '../stores/blockStore';
 import { useQueueStore } from '../stores/queueStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useSoundStore } from '../stores/soundStore';
@@ -125,6 +126,10 @@ const tryResolveNextCandidate = async (
     return undefined;
   }
 
+  if (candidate.stream) {
+    return { resolved: candidate, updated: candidates };
+  }
+
   const resolved = await streamingHost.resolveStreamForCandidate(candidate);
   if (!resolved) {
     return undefined;
@@ -215,6 +220,7 @@ export const useStreamResolution = (): void => {
   const { t } = useTranslation('streaming');
   const currentItemIdRef = useRef<string | null>(null);
   const isFirstResolutionRef = useRef(true);
+  const consecutiveSkipsRef = useRef(0);
 
   useEffect(() => {
     const onCurrentItemChanged = (currentItem: QueueItem | undefined): void => {
@@ -222,6 +228,24 @@ export const useStreamResolution = (): void => {
         return;
       }
 
+      const artists = currentItem.track.artists || [];
+      const tags = currentItem.track.tags || [];
+      const hasBlockedArtist = artists.some((a) => useBlockStore.getState().isArtistBlocked(a.name));
+      const hasBlockedGenre = tags.some((tag) => useBlockStore.getState().isGenreBlocked(tag));
+
+      if (hasBlockedArtist || hasBlockedGenre) {
+        consecutiveSkipsRef.current++;
+        const queueLength = useQueueStore.getState().items.length;
+        if (consecutiveSkipsRef.current >= queueLength) {
+          consecutiveSkipsRef.current = 0;
+          useSoundStore.getState().stop();
+          return;
+        }
+        useQueueStore.getState().goToNext();
+        return;
+      }
+
+      consecutiveSkipsRef.current = 0;
       const autoPlay = !isFirstResolutionRef.current;
       isFirstResolutionRef.current = false;
       currentItemIdRef.current = currentItem.id;
