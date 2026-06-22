@@ -111,15 +111,15 @@ describe('CustomWidgetField', () => {
     expect(setValue).toHaveBeenCalledWith({ sessionKey: 'new-key' });
   });
 
-  it('throws when the widget is not registered', async () => {
-    expect(() =>
-      render(
-        <CustomWidgetField
-          definition={makeDefinition()}
-          value={undefined}
-          setValue={vi.fn()}
-        />,
-      ),
-    ).toThrow('Custom widget "auth" not found for plugin "lastfm"');
+  it('renders a fallback when the widget is not registered', async () => {
+    const { container } = render(
+      <CustomWidgetField
+        definition={makeDefinition()}
+        value={undefined}
+        setValue={vi.fn()}
+      />,
+    );
+
+    expect(container.textContent).toContain('lastfm');
   });
 });

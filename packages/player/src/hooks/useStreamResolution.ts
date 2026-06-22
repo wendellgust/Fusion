@@ -216,6 +216,59 @@ const resolveStream = async (
   }
 };
 
+export const reResolveCurrentTrack = async (t: TFunction): Promise<void> => {
+  const currentItem = useQueueStore.getState().getCurrentItem();
+  if (!currentItem) {
+    return;
+  }
+
+  const { stop, setSrc } = useSoundStore.getState();
+  stop();
+
+  activeController?.abort();
+  activeController = new AbortController();
+  const { signal } = activeController;
+
+  useQueueStore
+    .getState()
+    .updateItemState(currentItem.id, { status: 'loading', error: undefined });
+
+  // Clear cached stream URLs so resolveStreamForCandidate fetches fresh signed URLs
+  const freshCandidates = (currentItem.track.streamCandidates ?? []).map(
+    (c) => ({
+      ...c,
+      stream: undefined as unknown as typeof c.stream,
+      failed: false,
+    }),
+  );
+  updateItemCandidates(currentItem, freshCandidates);
+
+  const freshItem = {
+    ...currentItem,
+    track: { ...currentItem.track, streamCandidates: freshCandidates },
+  };
+
+  const resolvedCandidate = await resolveStreamWithFallback(
+    freshCandidates,
+    freshItem,
+    signal,
+  );
+  if (signal.aborted) {
+    return;
+  }
+  if (!resolvedCandidate?.stream) {
+    setItemError(currentItem.id, 'errors.allCandidatesFailed', t);
+    return;
+  }
+
+  const audioSource = await buildAudioSource(resolvedCandidate);
+  if (signal.aborted) {
+    return;
+  }
+  setSrc(audioSource);
+  // Caller (SoundProvider) handles play + seek via handleCanPlay
+};
+
 export const useStreamResolution = (): void => {
   const { t } = useTranslation('streaming');
   const currentItemIdRef = useRef<string | null>(null);
@@ -230,8 +283,12 @@ export const useStreamResolution = (): void => {
 
       const artists = currentItem.track.artists || [];
       const tags = currentItem.track.tags || [];
-      const hasBlockedArtist = artists.some((a) => useBlockStore.getState().isArtistBlocked(a.name));
-      const hasBlockedGenre = tags.some((tag) => useBlockStore.getState().isGenreBlocked(tag));
+      const hasBlockedArtist = artists.some((a) =>
+        useBlockStore.getState().isArtistBlocked(a.name),
+      );
+      const hasBlockedGenre = tags.some((tag) =>
+        useBlockStore.getState().isGenreBlocked(tag),
+      );
 
       if (hasBlockedArtist || hasBlockedGenre) {
         consecutiveSkipsRef.current++;
@@ -256,7 +313,11 @@ export const useStreamResolution = (): void => {
       onCurrentItemChanged(state.getCurrentItem());
     });
 
-    onCurrentItemChanged(useQueueStore.getState().getCurrentItem());
+    const initialItem = useQueueStore.getState().getCurrentItem();
+    if (initialItem) {
+      onCurrentItemChanged(initialItem);
+    }
+    isFirstResolutionRef.current = false;
 
     return unsubscribe;
   }, [t]);

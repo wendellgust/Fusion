@@ -1,4 +1,4 @@
-import { AlertCircle, Music, X } from 'lucide-react';
+import { AlertCircle, ListPlus, Music, X } from 'lucide-react';
 import { FC } from 'react';
 
 import { pickArtwork } from '@nuclearplayer/model';
@@ -16,6 +16,7 @@ export const QueueItemExpanded: FC<QueueItemProps> = ({
   isCurrent = false,
   onSelect,
   onRemove,
+  onAddToPlaylist,
   labels,
   classes,
 }) => {
@@ -98,7 +99,7 @@ export const QueueItemExpanded: FC<QueueItemProps> = ({
           <div
             data-testid="queue-item-duration"
             className={cn(
-              'text-foreground mr-4 text-sm tabular-nums',
+              'text-foreground mr-4 text-sm tabular-nums transition-opacity group-hover:opacity-0',
               classes?.duration,
             )}
           >
@@ -106,26 +107,42 @@ export const QueueItemExpanded: FC<QueueItemProps> = ({
           </div>
         )}
 
-        {onRemove && (
-          <Button
-            data-testid="queue-item-remove-button"
-            size="icon-sm"
-            variant="noShadow"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onRemove();
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            aria-label={labels?.removeButton}
-            className={cn(
-              'absolute right-4 opacity-0 group-hover:opacity-100',
-              classes?.removeButton,
-            )}
-          >
-            <X size={16} />
-          </Button>
-        )}
+        <div className="absolute right-0 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          {onAddToPlaylist && (
+            <Button
+              data-testid="queue-item-add-to-playlist-button"
+              size="icon-sm"
+              variant="noShadow"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onAddToPlaylist();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={labels?.addToPlaylistButton}
+              title={labels?.addToPlaylistButton}
+            >
+              <ListPlus size={16} />
+            </Button>
+          )}
+          {onRemove && (
+            <Button
+              data-testid="queue-item-remove-button"
+              size="icon-sm"
+              variant="noShadow"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onRemove();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={labels?.removeButton}
+              className={cn(classes?.removeButton)}
+            >
+              <X size={16} />
+            </Button>
+          )}
+        </div>
       </div>
 
       {status === 'loading' && (

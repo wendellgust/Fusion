@@ -26,13 +26,33 @@ Fusion adds several productivity, moderation, and personalization features to th
   * **On Recap & Filters**: Go to the *Artist & Genre Filters* tab. Type any artist or style/genre name to block them manually.
 * **Behavior**: Any queued track featuring a blocked artist or containing a blocked genre/tag is automatically skipped during playback.
 
-### 4. Improved Presets & Browser Support 🌐
+### 4. Lyrics View 🎤
+* **Where to find it**: Click **Lyrics** in the left sidebar, or press the microphone icon in the player bar.
+* **How to use**: Lyrics are fetched automatically from [lrclib.net](https://lrclib.net) for the current track. Synced lyrics auto-scroll karaoke-style as the song plays; plain text lyrics are shown when timing data is unavailable. A live mini waveform is displayed alongside the artwork.
+
+### 5. Audio Visualizer 📊
+* **Where to find it**: Click **Visualizer** in the left sidebar, or press the waveform icon in the player bar.
+* **Modes**:
+  * **Spectrum** — 72-bar frequency analyzer with falling peak indicators and a purple/cyan gradient.
+  * **Oscilloscope** — real-time waveform with glow effect.
+* Supports **fullscreen** via the expand button. Controls fade in on hover while in fullscreen.
+
+### 6. Playlist Popover 🎵
+* **Where to find it**: Click the **+** icon on the currently playing track in the player bar.
+* **How to use**: Add the current track to any existing playlist, or create a new named playlist on the fly.
+
+### 7. Theme Editor 🖌️
+* **Where to find it**: Go to **Themes** in the left sidebar, then click **Edit** on any theme.
+* **How to use**: Write or paste custom CSS overriding theme variables and preview the result live. Themes are saved per-name and can be deleted.
+
+### 8. Improved Presets & Browser Support 🌐
 * Pre-configured with high-uptime HTTPS radio servers to avoid mixed-content web view blocks.
 * Playlists can be imported using your local Floorp browser cookies configuration.
 
-### 5. Custom Theme & Branding 🎨
+### 9. Custom Theme & Branding 🎨
 * Rebranded application window, app logo, and launcher name to **Fusion**.
 * Comes with the custom **Plasma** theme (violet/magenta palette) enabled as the default dark mode theme.
+* New **Matrix** theme — dark green terminal aesthetic.
 
 ## Screenshots
 

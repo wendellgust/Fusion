@@ -9,10 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VisualizerRouteImport } from './routes/visualizer'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SourcesRouteImport } from './routes/sources'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as RadioRouteImport } from './routes/radio'
+import { Route as LyricsRouteImport } from './routes/lyrics'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlaylistsIndexRouteImport } from './routes/playlists/index'
@@ -24,6 +26,11 @@ import { Route as PlaylistsImportProviderIdRouteImport } from './routes/playlist
 import { Route as ArtistProviderIdArtistIdRouteImport } from './routes/artist/$providerId/$artistId'
 import { Route as AlbumProviderIdAlbumIdRouteImport } from './routes/album/$providerId/$albumId'
 
+const VisualizerRoute = VisualizerRouteImport.update({
+  id: '/visualizer',
+  path: '/visualizer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
   path: '/stats',
@@ -42,6 +49,11 @@ const SearchRoute = SearchRouteImport.update({
 const RadioRoute = RadioRouteImport.update({
   id: '/radio',
   path: '/radio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LyricsRoute = LyricsRouteImport.update({
+  id: '/lyrics',
+  path: '/lyrics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -100,10 +112,12 @@ const AlbumProviderIdAlbumIdRoute = AlbumProviderIdAlbumIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/lyrics': typeof LyricsRoute
   '/radio': typeof RadioRoute
   '/search': typeof SearchRoute
   '/sources': typeof SourcesRoute
   '/stats': typeof StatsRoute
+  '/visualizer': typeof VisualizerRoute
   '/favorites/albums': typeof FavoritesAlbumsRoute
   '/favorites/artists': typeof FavoritesArtistsRoute
   '/favorites/tracks': typeof FavoritesTracksRoute
@@ -116,10 +130,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/lyrics': typeof LyricsRoute
   '/radio': typeof RadioRoute
   '/search': typeof SearchRoute
   '/sources': typeof SourcesRoute
   '/stats': typeof StatsRoute
+  '/visualizer': typeof VisualizerRoute
   '/favorites/albums': typeof FavoritesAlbumsRoute
   '/favorites/artists': typeof FavoritesArtistsRoute
   '/favorites/tracks': typeof FavoritesTracksRoute
@@ -133,10 +149,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/lyrics': typeof LyricsRoute
   '/radio': typeof RadioRoute
   '/search': typeof SearchRoute
   '/sources': typeof SourcesRoute
   '/stats': typeof StatsRoute
+  '/visualizer': typeof VisualizerRoute
   '/favorites/albums': typeof FavoritesAlbumsRoute
   '/favorites/artists': typeof FavoritesArtistsRoute
   '/favorites/tracks': typeof FavoritesTracksRoute
@@ -151,10 +169,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
+    | '/lyrics'
     | '/radio'
     | '/search'
     | '/sources'
     | '/stats'
+    | '/visualizer'
     | '/favorites/albums'
     | '/favorites/artists'
     | '/favorites/tracks'
@@ -167,10 +187,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/dashboard'
+    | '/lyrics'
     | '/radio'
     | '/search'
     | '/sources'
     | '/stats'
+    | '/visualizer'
     | '/favorites/albums'
     | '/favorites/artists'
     | '/favorites/tracks'
@@ -183,10 +205,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/dashboard'
+    | '/lyrics'
     | '/radio'
     | '/search'
     | '/sources'
     | '/stats'
+    | '/visualizer'
     | '/favorites/albums'
     | '/favorites/artists'
     | '/favorites/tracks'
@@ -200,10 +224,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
+  LyricsRoute: typeof LyricsRoute
   RadioRoute: typeof RadioRoute
   SearchRoute: typeof SearchRoute
   SourcesRoute: typeof SourcesRoute
   StatsRoute: typeof StatsRoute
+  VisualizerRoute: typeof VisualizerRoute
   FavoritesAlbumsRoute: typeof FavoritesAlbumsRoute
   FavoritesArtistsRoute: typeof FavoritesArtistsRoute
   FavoritesTracksRoute: typeof FavoritesTracksRoute
@@ -216,6 +242,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/visualizer': {
+      id: '/visualizer'
+      path: '/visualizer'
+      fullPath: '/visualizer'
+      preLoaderRoute: typeof VisualizerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/stats': {
       id: '/stats'
       path: '/stats'
@@ -242,6 +275,13 @@ declare module '@tanstack/react-router' {
       path: '/radio'
       fullPath: '/radio'
       preLoaderRoute: typeof RadioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lyrics': {
+      id: '/lyrics'
+      path: '/lyrics'
+      fullPath: '/lyrics'
+      preLoaderRoute: typeof LyricsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -320,10 +360,12 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
+  LyricsRoute: LyricsRoute,
   RadioRoute: RadioRoute,
   SearchRoute: SearchRoute,
   SourcesRoute: SourcesRoute,
   StatsRoute: StatsRoute,
+  VisualizerRoute: VisualizerRoute,
   FavoritesAlbumsRoute: FavoritesAlbumsRoute,
   FavoritesArtistsRoute: FavoritesArtistsRoute,
   FavoritesTracksRoute: FavoritesTracksRoute,

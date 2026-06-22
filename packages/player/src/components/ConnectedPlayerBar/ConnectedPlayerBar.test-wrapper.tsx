@@ -1,4 +1,10 @@
 import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
+import {
   act,
   fireEvent,
   render,
@@ -83,7 +89,14 @@ export const ConnectedPlayerBarWrapper = {
   QueueItemBuilder,
 
   async mount(): Promise<RenderResult> {
-    const result = render(<ConnectedPlayerBar />);
+    const rootRoute = createRootRoute({
+      component: ConnectedPlayerBar,
+    });
+    const router = createRouter({
+      routeTree: rootRoute,
+      history: createMemoryHistory({ initialEntries: ['/'] }),
+    });
+    const result = render(<RouterProvider router={router} />);
     await act(() => Promise.resolve());
     return result;
   },

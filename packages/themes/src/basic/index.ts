@@ -7,6 +7,7 @@ export const BUILTIN_BASIC_THEME_IDS = [
   'nuclear:lagoon',
   'nuclear:arctic-moss',
   'nuclear:plasma',
+  'nuclear:matrix',
 ] as const;
 
 export type BuiltinBasicThemeId = (typeof BUILTIN_BASIC_THEME_IDS)[number];

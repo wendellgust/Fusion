@@ -16,9 +16,9 @@ import { useAudioSeek } from './hooks/useAudioSeek';
 import { useHlsSource } from './hooks/useHlsSource';
 import { useMseSource } from './hooks/useMseSource';
 import { usePlaybackStatus } from './hooks/usePlaybackStatus';
+import { audioLog } from './logger';
 import { Destination } from './plugins/Destination';
 import { SoundProps } from './types';
-import { audioLog } from './logger';
 
 const PROTOCOLS_WITHOUT_WEB_AUDIO = new Set(['mse', 'hls']);
 
@@ -36,10 +36,21 @@ export const Sound: React.FC<SoundProps> = ({
   onError,
   children,
   bypassWebAudio = false,
+  onAudioElement,
 }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const handleAudioRef = useCallback(
+    (el: HTMLAudioElement | null) => {
+      audioRef.current = el;
+      onAudioElement?.(el);
+    },
+    [onAudioElement],
+  );
   const context = useAudioContext(bypassWebAudio);
-  const { source } = useAudioElementSource(audioRef, bypassWebAudio ? null : context);
+  const { source } = useAudioElementSource(
+    audioRef,
+    bypassWebAudio ? null : context,
+  );
   const isReady = bypassWebAudio ? true : !!source;
   const [audioNodes, setAudioNodes] = useState<AudioNode[]>([]);
 
@@ -68,7 +79,14 @@ export const Sound: React.FC<SoundProps> = ({
   useAudioLoader(audioRef, src, isReady);
   useHlsSource(audioRef, src, isReady);
   useMseSource(audioRef, src, isReady, onError);
-  usePlaybackStatus(audioRef, status, src.url, bypassWebAudio ? null : context, isReady, onError);
+  usePlaybackStatus(
+    audioRef,
+    status,
+    src.url,
+    bypassWebAudio ? null : context,
+    isReady,
+    onError,
+  );
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -82,11 +100,17 @@ export const Sound: React.FC<SoundProps> = ({
   }, [volume, src.protocol, bypassWebAudio]);
 
   useEffect(() => {
-    audioLog('debug', `Sound component rendering: url="${src.url}" protocol="${src.protocol}" status="${status}" bypassWebAudio=${bypassWebAudio}`);
+    audioLog(
+      'debug',
+      `Sound component rendering: url="${src.url}" protocol="${src.protocol}" status="${status}" bypassWebAudio=${bypassWebAudio}`,
+    );
   }, [src.url, src.protocol, status, bypassWebAudio]);
 
   const handleRegisterPlugin = useCallback((node: AudioNode) => {
-    audioLog('debug', `Registering audio plugin node: ${node.constructor.name}`);
+    audioLog(
+      'debug',
+      `Registering audio plugin node: ${node.constructor.name}`,
+    );
     setAudioNodes((prev) => [...prev, node]);
   }, []);
 
@@ -96,7 +120,10 @@ export const Sound: React.FC<SoundProps> = ({
   }, [onCanPlay]);
 
   const handleLoadStart = useCallback(() => {
-    audioLog('debug', `handleLoadStart callback triggered: starting load for url="${src.url}"`);
+    audioLog(
+      'debug',
+      `handleLoadStart callback triggered: starting load for url="${src.url}"`,
+    );
     onLoadStart?.();
   }, [onLoadStart, src.url]);
 
@@ -112,7 +139,7 @@ export const Sound: React.FC<SoundProps> = ({
   return (
     <>
       <audio
-        ref={audioRef}
+        ref={handleAudioRef}
         hidden
         preload={preload}
         crossOrigin={crossOrigin}

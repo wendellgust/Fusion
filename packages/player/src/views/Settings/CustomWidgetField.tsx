@@ -1,5 +1,6 @@
 import { FC } from 'react';
 
+import { useTranslation } from '@nuclearplayer/i18n';
 import type {
   CustomSettingDefinition,
   SettingValue,
@@ -19,13 +20,18 @@ export const CustomWidgetField: FC<CustomWidgetFieldProps> = ({
   value,
   setValue,
 }) => {
+  const { t } = useTranslation('settings');
   const pluginId = (definition.source as { pluginId: string }).pluginId;
   const Widget = widgetRegistry.get(pluginId, definition.widgetId);
   const pluginApi = usePluginStore((state) => state.plugins[pluginId]?.api);
 
   if (!Widget) {
-    throw new Error(
-      `Custom widget "${definition.widgetId}" not found for plugin "${pluginId}"`,
+    // The plugin may still be loading (registration is async) or may have
+    // failed; don't throw, or the whole settings section unmounts.
+    return (
+      <div className="text-foreground-secondary text-sm">
+        {t('customWidgetUnavailable', { pluginId })}
+      </div>
     );
   }
 

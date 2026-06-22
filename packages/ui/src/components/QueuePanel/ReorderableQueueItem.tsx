@@ -15,6 +15,7 @@ export type ReorderableQueueItemProps = {
   isReorderable?: boolean;
   onSelect?: (id: string) => void;
   onRemove?: (id: string) => void;
+  onAddToPlaylist?: (id: string) => void;
   labels: QueueItemLabels;
 };
 
@@ -25,6 +26,7 @@ export const ReorderableQueueItem: FC<ReorderableQueueItemProps> = ({
   isReorderable = false,
   onSelect,
   onRemove,
+  onAddToPlaylist,
   labels,
 }) => {
   const {
@@ -63,6 +65,9 @@ export const ReorderableQueueItem: FC<ReorderableQueueItemProps> = ({
         errorMessage={item.error}
         onSelect={() => onSelect?.(item.id)}
         onRemove={() => onRemove?.(item.id)}
+        onAddToPlaylist={
+          onAddToPlaylist ? () => onAddToPlaylist(item.id) : undefined
+        }
         labels={labels}
       />
     </div>

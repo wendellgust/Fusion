@@ -293,19 +293,29 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
   },
 
   goToIndex: withPersistence((index: number) => {
-    const { items } = get();
+    const { items, currentIndex } = get();
     if (index >= 0 && index < items.length) {
-      useSoundStore.getState().stop();
-      set({ currentIndex: index });
+      if (index === currentIndex) {
+        useSoundStore.getState().seekTo(0);
+        useSoundStore.getState().play();
+      } else {
+        useSoundStore.getState().stop();
+        set({ currentIndex: index });
+      }
     }
   }),
 
   goToId: withPersistence((id: string) => {
-    const { items } = get();
+    const { items, currentIndex } = get();
     const index = items.findIndex((item) => item.id === id);
     if (index !== -1) {
-      useSoundStore.getState().stop();
-      set({ currentIndex: index });
+      if (index === currentIndex) {
+        useSoundStore.getState().seekTo(0);
+        useSoundStore.getState().play();
+      } else {
+        useSoundStore.getState().stop();
+        set({ currentIndex: index });
+      }
     }
   }),
 

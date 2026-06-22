@@ -17,6 +17,7 @@ import './basic/ember.css';
 import './basic/lagoon.css';
 import './basic/arctic-moss.css';
 import './basic/plasma.css';
+import './basic/matrix.css';
 
 export type BasicThemeMeta = {
   id: string;
@@ -83,6 +84,16 @@ const BUILT_INS: BasicThemeMeta[] = [
       'oklch(0.97 0.015 310)',
       'oklch(0.40 0.12 315)',
       'oklch(0.18 0.03 300)',
+    ],
+  },
+  {
+    id: 'nuclear:matrix',
+    name: 'Matrix',
+    palette: [
+      'oklch(0.45 0.13 145)',
+      'oklch(0.96 0.02 145)',
+      'oklch(0.35 0.10 145)',
+      'oklch(0.13 0.02 145)',
     ],
   },
 ];

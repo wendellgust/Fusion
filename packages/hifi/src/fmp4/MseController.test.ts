@@ -400,4 +400,216 @@ describe('MseController', () => {
 
     expect(segmentFetchCalls.length).toBeGreaterThan(0);
   });
+
+  it('fetches next segment on timeupdate when buffer is empty', async () => {
+    const controller = new MseController();
+    const mediaSource = await initController(controller);
+
+    fetchMock.mockClear();
+
+    const sourceBuffer = mediaSource.sourceBuffers[0];
+    sourceBuffer.buffered = new MockTimeRanges();
+
+    Object.defineProperty(audio, 'currentTime', {
+      value: 70,
+      writable: true,
+      configurable: true,
+    });
+
+    controller.handleTimeUpdate(audio);
+    await flushMicrotasks();
+
+    const segmentFetchCalls = fetchMock.mock.calls.filter((call: unknown[]) => {
+      const opts = call[1] as { headers?: { Range?: string } } | undefined;
+      return opts?.headers?.Range && opts.headers.Range !== 'bytes=0-8191';
+    });
+
+    expect(segmentFetchCalls.length).toBeGreaterThan(0);
+  });
+
+  it('retries a failed segment fetch on a later timeupdate', async () => {
+    const controller = new MseController();
+    const mediaSource = await initController(controller);
+
+    const sourceBuffer = mediaSource.sourceBuffers[0];
+    sourceBuffer.buffered = new MockTimeRanges();
+    sourceBuffer.buffered.addRange(0, 60);
+
+    Object.defineProperty(audio, 'currentTime', {
+      value: 55,
+      writable: true,
+      configurable: true,
+    });
+
+    fetchMock.mockClear();
+    fetchMock.mockRejectedValueOnce(new Error('network down'));
+
+    controller.handleTimeUpdate(audio);
+    await flushMicrotasks();
+
+    sourceBuffer.appendBuffer.mockClear();
+
+    controller.handleTimeUpdate(audio);
+    await flushMicrotasks();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sourceBuffer.appendBuffer).toHaveBeenCalled();
+  });
+
+  it('refetches a segment whose append did not extend the buffer', async () => {
+    const controller = new MseController();
+    await initController(controller);
+
+    const getSegmentRanges = () =>
+      fetchMock.mock.calls
+        .map((call: unknown[]) => {
+          const opts = call[1] as { headers?: { Range?: string } } | undefined;
+          return opts?.headers?.Range;
+        })
+        .filter((range?: string) => range && range !== 'bytes=0-8191');
+
+    // Mock buffered stays empty, so init's append of segment 0 fails the
+    // buffered verification and the segment should be retried.
+    const initialSegmentRange = getSegmentRanges()[0];
+    expect(initialSegmentRange).toBeDefined();
+    fetchMock.mockClear();
+
+    Object.defineProperty(audio, 'currentTime', {
+      value: 0,
+      writable: true,
+      configurable: true,
+    });
+
+    controller.handleTimeUpdate(audio);
+    await flushMicrotasks();
+
+    expect(getSegmentRanges()).toContain(initialSegmentRange);
+  });
+
+  it('abandons a segment after repeated silent append drops and moves on', async () => {
+    const controller = new MseController();
+    await initController(controller);
+
+    const getSegmentRanges = () =>
+      fetchMock.mock.calls
+        .map((call: unknown[]) => {
+          const opts = call[1] as { headers?: { Range?: string } } | undefined;
+          return opts?.headers?.Range;
+        })
+        .filter((range?: string) => range && range !== 'bytes=0-8191');
+
+    const firstSegmentRange = getSegmentRanges()[0];
+    expect(firstSegmentRange).toBeDefined();
+
+    Object.defineProperty(audio, 'currentTime', {
+      value: 0,
+      writable: true,
+      configurable: true,
+    });
+
+    // Init was attempt 1; two more ticks exhaust the retries for segment 0.
+    for (let tick = 0; tick < 2; tick++) {
+      controller.handleTimeUpdate(audio);
+      await flushMicrotasks();
+    }
+
+    fetchMock.mockClear();
+    controller.handleTimeUpdate(audio);
+    await flushMicrotasks();
+
+    const segmentRanges = getSegmentRanges();
+
+    // Segment 0 is abandoned; refill should fetch the next segment instead
+    // of looping on the broken one forever.
+    expect(segmentRanges.length).toBeGreaterThan(0);
+    expect(segmentRanges).not.toContain(firstSegmentRange);
+  });
+
+  it('does not skip the next segment when buffered end drifts past its start time', async () => {
+    const controller = new MseController();
+
+    const initPromise = controller.init(audio, MSE_URL, 180);
+    await vi.waitFor(() => expect(latestMediaSource).not.toBeNull());
+
+    // Make appends land in a pre-existing buffered range whose end sits
+    // slightly past segment 0's sidx end time (real-world timestamp drift).
+    latestMediaSource!.addSourceBuffer.mockImplementation(
+      (): MockSourceBuffer => {
+        const sourceBuffer = new MockSourceBuffer();
+        sourceBuffer.buffered.addRange(0, 60.05);
+        latestMediaSource!.sourceBuffers.push(sourceBuffer);
+        return sourceBuffer;
+      },
+    );
+
+    latestMediaSource!.open();
+    await initPromise;
+
+    const segmentRanges = () =>
+      fetchMock.mock.calls
+        .map((call: unknown[]) => {
+          const opts = call[1] as { headers?: { Range?: string } } | undefined;
+          return opts?.headers?.Range;
+        })
+        .filter((range?: string) => range && range !== 'bytes=0-8191');
+
+    const firstRange = segmentRanges()[0];
+    const match = firstRange!.match(/bytes=(\d+)-(\d+)/)!;
+    const segment1Range = `bytes=${Number(match[2]) + 1}-${
+      Number(match[2]) + SEGMENT_REFS[1].referencedSize
+    }`;
+    fetchMock.mockClear();
+
+    Object.defineProperty(audio, 'currentTime', {
+      value: 50,
+      writable: true,
+      configurable: true,
+    });
+
+    controller.handleTimeUpdate(audio);
+    await flushMicrotasks();
+
+    expect(segmentRanges()).toContain(segment1Range);
+  });
+
+  it('reports an error after repeated segment fetch failures', async () => {
+    const onError = vi.fn();
+    const controller = new MseController();
+
+    const initPromise = controller.init(
+      audio,
+      MSE_URL,
+      180,
+      undefined,
+      onError,
+    );
+    await vi.waitFor(() => expect(latestMediaSource).not.toBeNull());
+    latestMediaSource!.open();
+    await initPromise;
+
+    const sourceBuffer = latestMediaSource!.sourceBuffers[0];
+    sourceBuffer.buffered = new MockTimeRanges();
+    sourceBuffer.buffered.addRange(0, 60);
+
+    Object.defineProperty(audio, 'currentTime', {
+      value: 55,
+      writable: true,
+      configurable: true,
+    });
+
+    fetchMock.mockRejectedValue(new Error('HTTP 403'));
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      controller.handleTimeUpdate(audio);
+      await flushMicrotasks();
+    }
+
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
+
+    fetchMock.mockClear();
+    controller.handleTimeUpdate(audio);
+    await flushMicrotasks();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

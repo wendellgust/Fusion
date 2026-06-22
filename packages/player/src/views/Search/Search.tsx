@@ -72,7 +72,9 @@ const SearchContent: FC<{
               title={item.title}
               src={pickArtwork(item.artwork, 'cover', 300)?.url}
               onClick={() =>
-                navigate({ to: `/album/${provider.id}/${item.source.id}` })
+                navigate({
+                  to: `/album/${item.source.provider}/${item.source.id}`,
+                })
               }
             />
           ))}
@@ -90,7 +92,9 @@ const SearchContent: FC<{
               title={item.name}
               src={pickArtwork(item.artwork, 'cover', 300)?.url}
               onClick={() =>
-                navigate({ to: `/artist/${provider.id}/${item.source.id}` })
+                navigate({
+                  to: `/artist/${item.source.provider}/${item.source.id}`,
+                })
               }
             />
           ))}

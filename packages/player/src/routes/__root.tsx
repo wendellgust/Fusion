@@ -1,15 +1,17 @@
 import { createRootRoute } from '@tanstack/react-router';
 import {
+  BarChart3,
   CableIcon,
   DiscIcon,
   GaugeIcon,
   ListMusicIcon,
+  MicVocalIcon,
   MusicIcon,
   Radio,
   SettingsIcon,
   UserIcon,
-  BarChart3,
 } from 'lucide-react';
+import { useState } from 'react';
 
 import { useTranslation } from '@nuclearplayer/i18n';
 import {
@@ -30,13 +32,16 @@ import { ConnectedSettingsModal } from '../components/ConnectedSettingsModal';
 import { ConnectedTopBar } from '../components/ConnectedTopBar';
 import { DevTools } from '../components/DevTools';
 import { FlatpakWarningBanner } from '../components/FlatpakWarningBanner';
+import { LyricsPanel } from '../components/LyricsPanel';
+import { PomodoroTimer } from '../components/PomodoroTimer';
 import { SoundProvider } from '../components/SoundProvider';
 import { StreamResolver } from '../components/StreamResolver';
-import { PomodoroTimer } from '../components/PomodoroTimer';
 import { GlobalShortcuts } from '../shortcuts';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useSettingsModalStore } from '../stores/settingsModalStore';
 import { useStartupStore } from '../stores/startupStore';
+
+type RightTab = 'queue' | 'lyrics';
 
 const RootComponent = () => {
   const { t } = useTranslation('navigation');
@@ -51,6 +56,7 @@ const RootComponent = () => {
   } = useLayoutStore();
   const openSettings = useSettingsModalStore((state) => state.open);
   const isStartingUp = useStartupStore((state) => state.isStartingUp);
+  const [rightTab, setRightTab] = useState<RightTab>('queue');
 
   return (
     <PlayerShell>
@@ -76,6 +82,11 @@ const RootComponent = () => {
                   label={t('dashboard')}
                 />
                 <SidebarNavigationItem
+                  to="/playlists"
+                  icon={<ListMusicIcon />}
+                  label={t('playlists')}
+                />
+                <SidebarNavigationItem
                   to="/stats"
                   icon={<BarChart3 />}
                   label="Recap & Filters"
@@ -96,11 +107,6 @@ const RootComponent = () => {
                   label={t('favoriteArtists')}
                 />
                 <SidebarNavigationItem
-                  to="/playlists"
-                  icon={<ListMusicIcon />}
-                  label={t('playlists')}
-                />
-                <SidebarNavigationItem
                   to="/radio"
                   icon={<Radio />}
                   label={t('radio')}
@@ -109,6 +115,11 @@ const RootComponent = () => {
                   to="/sources"
                   icon={<CableIcon />}
                   label={t('sources')}
+                />
+                <SidebarNavigationItem
+                  to="/lyrics"
+                  icon={<MicVocalIcon />}
+                  label="Lyrics"
                 />
               </div>
               <PomodoroTimer isCompact={leftSidebar.isCollapsed} />
@@ -129,9 +140,36 @@ const RootComponent = () => {
             isCollapsed={rightSidebar.isCollapsed}
             onWidthChange={setRightSidebarWidth}
             onToggle={toggleRightSidebar}
-            headerActions={<QueueHeaderActions />}
+            headerActions={
+              rightSidebar.isCollapsed ? undefined : (
+                <div className="flex items-center gap-1">
+                  {rightTab === 'queue' && <QueueHeaderActions />}
+                  <div className="border-border/30 flex overflow-hidden rounded-md border">
+                    <button
+                      className={`px-2 py-0.5 text-xs font-medium transition-colors ${rightTab === 'queue' ? 'bg-primary text-primary-foreground' : 'text-foreground-secondary hover:text-foreground'}`}
+                      onClick={() => setRightTab('queue')}
+                      title="Queue"
+                    >
+                      Queue
+                    </button>
+                    <button
+                      className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium transition-colors ${rightTab === 'lyrics' ? 'bg-primary text-primary-foreground' : 'text-foreground-secondary hover:text-foreground'}`}
+                      onClick={() => setRightTab('lyrics')}
+                      title="Lyrics"
+                    >
+                      <MicVocalIcon size={11} />
+                      Lyrics
+                    </button>
+                  </div>
+                </div>
+              )
+            }
           >
-            <ConnectedQueuePanel isCollapsed={rightSidebar.isCollapsed} />
+            {rightTab === 'queue' || rightSidebar.isCollapsed ? (
+              <ConnectedQueuePanel isCollapsed={rightSidebar.isCollapsed} />
+            ) : (
+              <LyricsPanel />
+            )}
           </PlayerWorkspace.RightSidebar>
         </PlayerWorkspace>
       </SoundProvider>

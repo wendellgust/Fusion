@@ -1,12 +1,12 @@
 import { RefObject, useEffect, useRef } from 'react';
-import { audioLog } from '../logger';
 
+import { audioLog } from '../logger';
 import { SoundStatus } from '../types';
 
-const HAVE_FUTURE_DATA = 3;
+const HAVE_METADATA = 1;
 
 const isReadyToPlay = (audio: HTMLAudioElement): boolean =>
-  audio.readyState >= HAVE_FUTURE_DATA;
+  audio.readyState >= HAVE_METADATA;
 
 export const usePlaybackStatus = (
   audioRef: RefObject<HTMLAudioElement | null>,
@@ -28,12 +28,18 @@ export const usePlaybackStatus = (
     }
 
     const srcChanged = srcUrl !== activeSrcRef.current;
-    audioLog('debug', `usePlaybackStatus status: ${status}, srcUrl: ${srcUrl}, srcChanged: ${srcChanged}`);
+    audioLog(
+      'debug',
+      `usePlaybackStatus status: ${status}, srcUrl: ${srcUrl}, srcChanged: ${srcChanged}`,
+    );
 
     const tryPlay = () => {
-      audioLog('debug', `tryPlay: readyState=${audio.readyState}, paused=${audio.paused}`);
+      audioLog(
+        'debug',
+        `tryPlay: readyState=${audio.readyState}, paused=${audio.paused}`,
+      );
       if (!isReadyToPlay(audio)) {
-        audioLog('debug', `tryPlay: ignored, readyState < HAVE_FUTURE_DATA`);
+        audioLog('debug', `tryPlay: ignored, readyState < HAVE_METADATA`);
         return;
       }
       if (!audio.paused) {
@@ -42,34 +48,46 @@ export const usePlaybackStatus = (
       }
       activeSrcRef.current = srcUrl;
       if (context) {
-        audioLog('debug', `Resuming AudioContext. Current state: ${context.state}`);
+        audioLog(
+          'debug',
+          `Resuming AudioContext. Current state: ${context.state}`,
+        );
         const resumePromise = context.resume();
         if (resumePromise && typeof resumePromise.then === 'function') {
           resumePromise.then(() => {
             audioLog('debug', `AudioContext resumed. State: ${context.state}`);
           });
         } else {
-          audioLog('debug', `AudioContext resumed (sync/mock). State: ${context.state}`);
+          audioLog(
+            'debug',
+            `AudioContext resumed (sync/mock). State: ${context.state}`,
+          );
         }
       }
       audioLog('debug', `Calling audio.play()`);
       audio.play().then(
         () => {
-          audioLog('debug', `audio.play() succeeded. Current time: ${audio.currentTime}`);
+          audioLog(
+            'debug',
+            `audio.play() succeeded. Current time: ${audio.currentTime}`,
+          );
         },
         (err: DOMException) => {
-          audioLog('error', `audio.play() failed: ${err.name} - ${err.message}`);
+          audioLog(
+            'error',
+            `audio.play() failed: ${err.name} - ${err.message}`,
+          );
           if (err.name === 'AbortError') {
             return;
           }
           onError?.(err);
-        }
+        },
       );
     };
 
     switch (status) {
       case 'playing': {
-        if (!srcChanged) {
+        if (!srcChanged || isReadyToPlay(audio)) {
           tryPlay();
         }
         const onCanPlay = () => {
@@ -85,7 +103,10 @@ export const usePlaybackStatus = (
         return;
       }
       case 'stopped': {
-        audioLog('debug', `Stopping HTMLAudioElement (pause and reset currentTime)`);
+        audioLog(
+          'debug',
+          `Stopping HTMLAudioElement (pause and reset currentTime)`,
+        );
         activeSrcRef.current = null;
         audio.pause();
         audio.currentTime = 0;

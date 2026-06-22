@@ -7,12 +7,14 @@ import { queueItemVariants } from './variants';
 export type QueueItemLabels = {
   removeButton?: string;
   playbackError?: string;
+  addToPlaylistButton?: string;
 };
 
 export type QueueItemProps = VariantProps<typeof queueItemVariants> & {
   track: Track;
   onSelect?: () => void;
   onRemove?: () => void;
+  onAddToPlaylist?: () => void;
   errorMessage?: string;
   labels: QueueItemLabels;
   classes?: {

@@ -4,6 +4,7 @@ import { useTranslation } from '@nuclearplayer/i18n';
 import { Tabs, ViewShell } from '@nuclearplayer/ui';
 
 import { MyThemes } from './MyThemes';
+import { ThemeEditor } from './ThemeEditor';
 import { ThemeStore } from './ThemeStore';
 
 export const Themes = () => {
@@ -28,6 +29,11 @@ export const Themes = () => {
             id: 'store',
             label: t('tabs.store'),
             content: <ThemeStore />,
+          },
+          {
+            id: 'editor',
+            label: t('tabs.editor'),
+            content: <ThemeEditor />,
           },
         ]}
       />

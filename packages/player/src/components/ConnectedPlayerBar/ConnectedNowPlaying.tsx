@@ -6,6 +6,7 @@ import { FavoriteButton, PlayerBar } from '@nuclearplayer/ui';
 
 import { useFavoritesStore } from '../../stores/favoritesStore';
 import { useQueueStore } from '../../stores/queueStore';
+import { PlaylistPopover } from './PlaylistPopover';
 
 export const ConnectedNowPlaying: FC = () => {
   const { t } = useTranslation('playerBar');
@@ -38,13 +39,16 @@ export const ConnectedNowPlaying: FC = () => {
       coverUrl={artwork?.url}
       action={
         track && (
-          <FavoriteButton
-            size="sm"
-            isFavorite={isFavorite}
-            onToggle={handleToggleFavorite}
-            ariaLabelAdd={tTrack('actions.addToFavorites')}
-            ariaLabelRemove={tTrack('actions.removeFromFavorites')}
-          />
+          <div className="flex items-center gap-2">
+            <FavoriteButton
+              size="sm"
+              isFavorite={isFavorite}
+              onToggle={handleToggleFavorite}
+              ariaLabelAdd={tTrack('actions.addToFavorites')}
+              ariaLabelRemove={tTrack('actions.removeFromFavorites')}
+            />
+            <PlaylistPopover track={track} />
+          </div>
         )
       }
     />

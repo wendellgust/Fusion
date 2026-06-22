@@ -126,11 +126,43 @@ export const createMetadataHost = (): MetadataHost => {
       params: SearchParams,
       providerId?: string,
     ): Promise<SearchResults> => {
-      const provider = getProvider(providerId);
-      if (!provider) {
+      if (providerId) {
+        const provider = getProvider(providerId);
+        if (!provider) {
+          throw new Error('No metadata provider available');
+        }
+        return executeMetadataSearch(provider, params);
+      }
+
+      const allProviders = providersHost.list('metadata') as MetadataProvider[];
+      if (allProviders.length === 0) {
         throw new Error('No metadata provider available');
       }
-      return executeMetadataSearch(provider, params);
+
+      const settled = await Promise.allSettled(
+        allProviders.map((p) => executeMetadataSearch(p, params)),
+      );
+
+      const merged: SearchResults = {};
+      for (const result of settled) {
+        if (result.status === 'rejected') {
+          continue;
+        }
+        const r = result.value;
+        if (r.artists) {
+          merged.artists = [...(merged.artists ?? []), ...r.artists];
+        }
+        if (r.albums) {
+          merged.albums = [...(merged.albums ?? []), ...r.albums];
+        }
+        if (r.tracks) {
+          merged.tracks = [...(merged.tracks ?? []), ...r.tracks];
+        }
+        if (r.playlists) {
+          merged.playlists = [...(merged.playlists ?? []), ...r.playlists];
+        }
+      }
+      return merged;
     },
 
     fetchArtistBio: withArtistCapability<ArtistBio>(

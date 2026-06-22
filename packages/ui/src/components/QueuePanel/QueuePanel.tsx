@@ -18,6 +18,7 @@ export type QueuePanelProps = {
   onReorder?: (fromIndex: number, toIndex: number) => void;
   onSelectItem?: (itemId: string) => void;
   onRemoveItem?: (itemId: string) => void;
+  onAddToPlaylist?: (itemId: string) => void;
   labels: QueueItemLabels & {
     emptyTitle?: string;
     emptySubtitle?: string;
@@ -37,6 +38,7 @@ export const QueuePanel: FC<QueuePanelProps> = ({
   onReorder,
   onSelectItem,
   onRemoveItem,
+  onAddToPlaylist,
   labels,
   classes,
 }) => {
@@ -116,9 +118,11 @@ export const QueuePanel: FC<QueuePanelProps> = ({
                 isReorderable={reorderable}
                 onSelect={onSelectItem}
                 onRemove={onRemoveItem}
+                onAddToPlaylist={onAddToPlaylist}
                 labels={{
                   removeButton: labels?.removeButton,
                   playbackError: labels?.playbackError,
+                  addToPlaylistButton: labels?.addToPlaylistButton,
                 }}
               />
             ))}

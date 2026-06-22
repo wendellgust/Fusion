@@ -1,10 +1,12 @@
 import { useNavigate } from '@tanstack/react-router';
-import { EllipsisIcon, Trash2Icon } from 'lucide-react';
+import { EllipsisIcon, ListXIcon, Trash2Icon } from 'lucide-react';
 import { FC, useState } from 'react';
 
 import { useTranslation } from '@nuclearplayer/i18n';
+import type { Track } from '@nuclearplayer/model';
 import { Button, Dialog, Input, Popover, QueuePanel } from '@nuclearplayer/ui';
 
+import { useCoreSetting } from '../hooks/useCoreSetting';
 import { useCurrentQueueItem } from '../hooks/useCurrentQueueItem';
 import { useQueue } from '../hooks/useQueue';
 import { useQueueActions } from '../hooks/useQueueActions';
@@ -18,9 +20,18 @@ export const ConnectedQueuePanel: FC<ConnectedQueuePanelProps> = ({
   isCollapsed = false,
 }) => {
   const { t } = useTranslation('queue');
+  const { t: tPlaylists } = useTranslation('playlists');
   const queue = useQueue();
   const currentItem = useCurrentQueueItem();
   const actions = useQueueActions();
+  const playlistIndex = usePlaylistStore((state) => state.index);
+  const addTracks = usePlaylistStore((state) => state.addTracks);
+  const loadIndex = usePlaylistStore((state) => state.loadIndex);
+  const loaded = usePlaylistStore((state) => state.loaded);
+
+  const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(
+    null,
+  );
 
   const handleReorder = (fromIndex: number, toIndex: number) => {
     actions.reorder(fromIndex, toIndex);
@@ -34,22 +45,71 @@ export const ConnectedQueuePanel: FC<ConnectedQueuePanelProps> = ({
     actions.removeByIds([itemId]);
   };
 
+  const handleAddToPlaylist = (itemId: string) => {
+    const item = queue.items.find((i) => i.id === itemId);
+    if (!item) {
+      return;
+    }
+    if (!loaded) {
+      loadIndex();
+    }
+    setAddToPlaylistTrack(item.track);
+  };
+
+  const handlePickPlaylist = async (playlistId: string) => {
+    if (!addToPlaylistTrack) {
+      return;
+    }
+    await addTracks(playlistId, [addToPlaylistTrack]);
+    setAddToPlaylistTrack(null);
+  };
+
   return (
-    <QueuePanel
-      items={queue.items}
-      currentItemId={currentItem?.id}
-      isCollapsed={isCollapsed}
-      reorderable={!isCollapsed}
-      onReorder={handleReorder}
-      onSelectItem={handleSelectItem}
-      onRemoveItem={handleRemoveItem}
-      labels={{
-        emptyTitle: t('empty.title'),
-        emptySubtitle: t('empty.subtitle'),
-        removeButton: t('actions.remove'),
-        playbackError: t('errors.playback'),
-      }}
-    />
+    <>
+      <QueuePanel
+        items={queue.items}
+        currentItemId={currentItem?.id}
+        isCollapsed={isCollapsed}
+        reorderable={!isCollapsed}
+        onReorder={handleReorder}
+        onSelectItem={handleSelectItem}
+        onRemoveItem={handleRemoveItem}
+        onAddToPlaylist={isCollapsed ? undefined : handleAddToPlaylist}
+        labels={{
+          emptyTitle: t('empty.title'),
+          emptySubtitle: t('empty.subtitle'),
+          removeButton: t('actions.remove'),
+          playbackError: t('errors.playback'),
+          addToPlaylistButton: tPlaylists('addToPlaylist'),
+        }}
+      />
+      <Dialog.Root
+        isOpen={addToPlaylistTrack !== null}
+        onClose={() => setAddToPlaylistTrack(null)}
+      >
+        <Dialog.Title>{tPlaylists('addToPlaylist')}</Dialog.Title>
+        <div className="mt-4 flex max-h-64 flex-col gap-1 overflow-y-auto">
+          {playlistIndex.length === 0 ? (
+            <p className="text-foreground-secondary text-sm">
+              {tPlaylists('empty')}
+            </p>
+          ) : (
+            playlistIndex.map((entry) => (
+              <button
+                key={entry.id}
+                className="hover:bg-foreground/5 text-foreground rounded px-3 py-2 text-left text-sm transition-colors"
+                onClick={() => handlePickPlaylist(entry.id)}
+              >
+                {entry.name}
+              </button>
+            ))
+          )}
+        </div>
+        <Dialog.Actions>
+          <Dialog.Close>{t('common:actions.cancel')}</Dialog.Close>
+        </Dialog.Actions>
+      </Dialog.Root>
+    </>
   );
 };
 
@@ -63,6 +123,9 @@ export const QueueHeaderActions: FC = () => {
     (state) => state.saveQueueAsPlaylist,
   );
 
+  const [autoRemovePlayed, setAutoRemovePlayed] = useCoreSetting<boolean>(
+    'playback.autoRemovePlayed',
+  );
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [playlistName, setPlaylistName] = useState('');
 
@@ -82,6 +145,18 @@ export const QueueHeaderActions: FC = () => {
 
   return (
     <>
+      <Button
+        size="icon"
+        variant={autoRemovePlayed ? 'default' : 'text'}
+        onClick={() => setAutoRemovePlayed(!autoRemovePlayed)}
+        title={
+          autoRemovePlayed
+            ? 'Auto-remove played: ON'
+            : 'Auto-remove played: OFF'
+        }
+      >
+        <ListXIcon />
+      </Button>
       <Button size="icon" data-testid="clear-queue-button" onClick={clearQueue}>
         <Trash2Icon />
       </Button>

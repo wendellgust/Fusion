@@ -1,8 +1,12 @@
+import { audioLog } from '../logger';
 import { parseInitSegment, SegmentReference } from './parser';
 
 const HEADER_FETCH_SIZE = 8192;
 const LOOKAHEAD_SECONDS = 30;
 const SEEK_PREFETCH_COUNT = 3;
+const MAX_CONSECUTIVE_FETCH_FAILURES = 20;
+const MAX_SEGMENT_APPEND_RETRIES = 3;
+const FETCH_RETRY_DELAYS_MS = [500, 1500, 4000];
 
 type MseBackend = {
   Constructor: typeof MediaSource;
@@ -67,6 +71,23 @@ function findSegmentForTime(
   return -1;
 }
 
+class FetchError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly upstreamStatus?: number,
+  ) {
+    super(message);
+  }
+}
+
+// The proxy returns 502 when the upstream (YouTube) returns an error.
+// The upstream status is embedded in the response body.
+function parseUpstreamStatus(body: string): number | undefined {
+  const match = body.match(/(\d{3})/);
+  return match ? parseInt(match[1]) : undefined;
+}
+
 async function fetchRange(
   url: string,
   startByte: number,
@@ -80,11 +101,50 @@ async function fetchRange(
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(body || `Fetch failed with status ${response.status}`);
+    const upstreamStatus =
+      response.status === 502 ? parseUpstreamStatus(body) : undefined;
+    throw new FetchError(
+      body || `Fetch failed with status ${response.status}`,
+      response.status,
+      upstreamStatus,
+    );
   }
 
   const buffer = await response.arrayBuffer();
   return new Uint8Array(buffer);
+}
+
+async function fetchRangeWithRetry(
+  url: string,
+  startByte: number,
+  endByte: number,
+  signal: AbortSignal,
+): Promise<Uint8Array> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= FETCH_RETRY_DELAYS_MS.length; attempt++) {
+    if (signal.aborted) {
+      throw new Error('aborted');
+    }
+    try {
+      return await fetchRange(url, startByte, endByte, signal);
+    } catch (error) {
+      lastError = error;
+      if (signal.aborted) {
+        throw error;
+      }
+      const isExpiredUrl =
+        error instanceof FetchError && error.upstreamStatus === 403;
+      const isRetryable =
+        !isExpiredUrl &&
+        (!(error instanceof FetchError) || error.status >= 500);
+      const delay = FETCH_RETRY_DELAYS_MS[attempt];
+      if (!isRetryable || delay === undefined) {
+        break;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError;
 }
 
 function isTimeBuffered(sourceBuffer: SourceBuffer, time: number): boolean {
@@ -97,6 +157,22 @@ function isTimeBuffered(sourceBuffer: SourceBuffer, time: number): boolean {
   return false;
 }
 
+// End of the buffered range the playhead is in — not the end of the last
+// range. Using the last range hides holes between the playhead and the end
+// of the buffer, and a hole is exactly where the decoder stalls.
+function contiguousBufferedEnd(
+  sourceBuffer: SourceBuffer,
+  time: number,
+): number {
+  const { buffered } = sourceBuffer;
+  for (let index = 0; index < buffered.length; index++) {
+    if (time >= buffered.start(index) - 0.1 && time <= buffered.end(index)) {
+      return buffered.end(index);
+    }
+  }
+  return time;
+}
+
 export class MseController {
   private mediaSource: MediaSource | null = null;
   private sourceBuffer: SourceBuffer | null = null;
@@ -107,6 +183,12 @@ export class MseController {
   private objectUrl: string | null = null;
   private url = '';
   private isFetching = false;
+  private onError?: (error: Error) => void;
+  private consecutiveFailures = 0;
+  private failed = false;
+  private permanentlyFailed = false;
+  private segmentRetryCounts = new Map<number, number>();
+  private abandonedSegments = new Set<number>();
 
   async init(
     audio: HTMLAudioElement,
@@ -116,6 +198,7 @@ export class MseController {
     onError?: (error: Error) => void,
   ): Promise<void> {
     this.url = url;
+    this.onError = onError;
     const abortController = new AbortController();
     this.abortController = abortController;
     const { signal } = abortController;
@@ -190,30 +273,53 @@ export class MseController {
       return;
     }
 
-    await this.fetchAndAppendSegment(0, signal);
+    // Block timeupdate/watchdog-driven fetches until the first segment is
+    // fully appended; concurrent appendBuffer calls throw InvalidStateError.
+    this.isFetching = true;
+    try {
+      await this.fetchAndAppendSegment(0, signal);
+    } finally {
+      this.isFetching = false;
+    }
   }
 
   handleTimeUpdate(audio: HTMLAudioElement): void {
     const { sourceBuffer, segments } = this;
-    if (this.isFetching || !sourceBuffer || segments.length === 0) {
+    if (
+      this.isFetching ||
+      this.failed ||
+      !sourceBuffer ||
+      segments.length === 0
+    ) {
       return;
     }
 
-    const { buffered } = sourceBuffer;
-    if (buffered.length === 0) {
-      return;
-    }
-
-    const bufferedEnd = buffered.end(buffered.length - 1);
+    const bufferedEnd = contiguousBufferedEnd(sourceBuffer, audio.currentTime);
     const lookAheadThreshold = audio.currentTime + LOOKAHEAD_SECONDS;
 
     if (bufferedEnd >= lookAheadThreshold) {
       return;
     }
 
-    const nextIndex = this.findNextUnfetchedSegment(bufferedEnd);
+    let nextIndex = this.findNextUnfetchedSegment(bufferedEnd);
     if (nextIndex === -1) {
-      return;
+      // Everything ahead is marked fetched yet the buffer ends early — a
+      // segment was silently dropped after fetch. Un-mark it for refetch,
+      // unless it's actually buffered and this is just edge rounding.
+      const holeIndex = findSegmentForTime(bufferedEnd + 0.01, this.segments);
+      if (
+        holeIndex === -1 ||
+        !this.fetchedSegments.has(holeIndex) ||
+        this.abandonedSegments.has(holeIndex)
+      ) {
+        return;
+      }
+      const hole = this.segments[holeIndex];
+      if (isTimeBuffered(sourceBuffer, (hole.startTime + hole.endTime) / 2)) {
+        return;
+      }
+      this.fetchedSegments.delete(holeIndex);
+      nextIndex = holeIndex;
     }
 
     const controller = this.abortController;
@@ -257,6 +363,8 @@ export class MseController {
       sourceBuffer.remove(0, Infinity);
       await waitForUpdateEnd(sourceBuffer);
       this.fetchedSegments.clear();
+      this.segmentRetryCounts.clear();
+      this.abandonedSegments.clear();
 
       if (abortController.signal.aborted) {
         return;
@@ -318,6 +426,37 @@ export class MseController {
     this.initSegment = null;
     this.fetchedSegments = new Set();
     this.url = '';
+    this.onError = undefined;
+    this.consecutiveFailures = 0;
+    this.failed = false;
+    this.permanentlyFailed = false;
+    this.segmentRetryCounts = new Map();
+    this.abandonedSegments = new Set();
+  }
+
+  get isRecoverable(): boolean {
+    return !this.permanentlyFailed;
+  }
+
+  resetFailed(): void {
+    this.failed = false;
+    this.consecutiveFailures = 0;
+  }
+
+  private registerSegmentFailure(
+    segmentIndex: number,
+    error: unknown,
+    fallbackMessage: string,
+  ): void {
+    // Un-mark the segment so the next refill attempt retries it.
+    this.fetchedSegments.delete(segmentIndex);
+    this.consecutiveFailures += 1;
+    if (this.consecutiveFailures >= MAX_CONSECUTIVE_FETCH_FAILURES) {
+      this.failed = true;
+      this.onError?.(
+        error instanceof Error ? error : new Error(fallbackMessage),
+      );
+    }
   }
 
   private findNextUnfetchedSegment(bufferedEnd: number): number {
@@ -325,7 +464,11 @@ export class MseController {
       if (this.fetchedSegments.has(index)) {
         continue;
       }
-      if (this.segments[index].startTime >= bufferedEnd - 0.01) {
+      // Match by endTime, not startTime: the real buffered end (from the
+      // media's own timestamps) can drift a few ms past the sidx-derived
+      // startTime of the next segment, which would skip it forever and
+      // leave a permanent hole. Re-appending overlap is harmless.
+      if (this.segments[index].endTime > bufferedEnd + 0.01) {
         return index;
       }
     }
@@ -352,14 +495,30 @@ export class MseController {
 
     let segmentData: Uint8Array;
     try {
-      segmentData = await fetchRange(
+      segmentData = await fetchRangeWithRetry(
         this.url,
         segment.startByte,
         segment.endByte,
         signal,
       );
-    } catch {
-      this.fetchedSegments.delete(segmentIndex);
+    } catch (error) {
+      if (signal.aborted) {
+        this.fetchedSegments.delete(segmentIndex);
+        return;
+      }
+      // YouTube returns 403 when signed URL expires; proxy wraps it as 502.
+      // Retrying the same URL is pointless — signal for re-resolution.
+      if (error instanceof FetchError && error.upstreamStatus === 403) {
+        this.failed = true;
+        this.permanentlyFailed = true;
+        this.onError?.(new Error('stream:expired'));
+        return;
+      }
+      this.registerSegmentFailure(
+        segmentIndex,
+        error,
+        'Failed to fetch audio segment',
+      );
       return;
     }
 
@@ -368,8 +527,44 @@ export class MseController {
       return;
     }
 
-    sourceBuffer.appendBuffer(segmentData.buffer as ArrayBuffer);
-    await waitForUpdateEnd(sourceBuffer);
+    try {
+      if (sourceBuffer.updating) {
+        await waitForUpdateEnd(sourceBuffer);
+      }
+      sourceBuffer.appendBuffer(segmentData.buffer as ArrayBuffer);
+      await waitForUpdateEnd(sourceBuffer);
+    } catch (error) {
+      this.registerSegmentFailure(
+        segmentIndex,
+        error,
+        'Failed to append audio segment',
+      );
+      return;
+    }
+
+    // SourceBuffer can accept an append and still drop the data without a
+    // synchronous error (async parse/decode failure). That leaves a hole in
+    // the buffer that stalls the decoder at a fixed position, so verify the
+    // segment actually landed before considering it done.
+    const segmentMidTime = (segment.startTime + segment.endTime) / 2;
+    if (!isTimeBuffered(sourceBuffer, segmentMidTime)) {
+      const retries = (this.segmentRetryCounts.get(segmentIndex) ?? 0) + 1;
+      this.segmentRetryCounts.set(segmentIndex, retries);
+      audioLog(
+        'warn',
+        `MSE append of segment ${segmentIndex} (${segment.startTime.toFixed(1)}s-${segment.endTime.toFixed(1)}s) was not buffered, attempt ${retries}`,
+      );
+      if (retries < MAX_SEGMENT_APPEND_RETRIES) {
+        this.fetchedSegments.delete(segmentIndex);
+      } else {
+        // Decoder keeps rejecting this segment; keep it marked fetched so
+        // refill moves on, and let the stall watchdog jump the hole.
+        this.abandonedSegments.add(segmentIndex);
+      }
+      return;
+    }
+
+    this.consecutiveFailures = 0;
 
     const allFetched = this.fetchedSegments.size === segments.length;
     const mediaSource = this.mediaSource;
