@@ -19,7 +19,6 @@ const MarketplacePluginSchema = z.object({
   description: z.string(),
   author: z.string().min(1),
   repo: z.string().regex(/^[^/]+\/[^/]+$/),
-  // TODO: Remove category after registry migration to categories
   category: PluginCategorySchema.optional(),
   categories: z.array(PluginCategorySchema).optional(),
   tags: z.array(z.string()).optional(),
@@ -36,15 +35,15 @@ const RegistrySchema = z.object({
 
 const GitHubReleaseSchema = z.object({
   tag_name: z.string(),
-  name: z.string(),
-  published_at: z.string(),
+  name: z.string().optional(),
+  published_at: z.string().optional(),
   assets: z.array(
     z.object({
       name: z.string(),
-      browser_download_url: z.string().url(),
-      size: z.number(),
+      browser_download_url: z.string(),
+      size: z.number().optional(),
     }),
-  ),
+  ).optional(),
 });
 
 export type MarketplacePlugin = z.infer<typeof MarketplacePluginSchema>;
@@ -80,22 +79,44 @@ class GitHubReleasesApi extends ApiClient {
       throw new Error(`Invalid repo format: ${repo}`);
     }
 
-    const release = await this.fetch(
-      `/repos/${repo}/releases/latest`,
-      GitHubReleaseSchema,
-    );
+    const githubUrl = `https://api.github.com/repos/${repo}/releases/latest`;
+    const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(githubUrl)}`;
 
-    const asset = release.assets.find((a) => a.name === PLUGIN_ASSET_NAME);
-    if (!asset) {
-      throw new Error(`No ${PLUGIN_ASSET_NAME} in release for ${repo}`);
+    let releaseData: any;
+    try {
+      const res = await fetch(proxyUrl);
+      if (res.ok) {
+        releaseData = await res.json();
+      } else {
+        releaseData = await this.fetch(
+          `/repos/${repo}/releases/latest`,
+          GitHubReleaseSchema,
+        );
+      }
+    } catch {
+      releaseData = await this.fetch(
+        `/repos/${repo}/releases/latest`,
+        GitHubReleaseSchema,
+      );
     }
 
+    const assets = releaseData.assets || [];
+    const asset =
+      assets.find((a: any) => a.name === PLUGIN_ASSET_NAME) ||
+      assets.find((a: any) => a.name?.endsWith('.zip')) ||
+      assets[0];
+
+    const tagName = releaseData.tag_name || '1.0.0';
+    const downloadUrl = asset
+      ? asset.browser_download_url
+      : `https://github.com/${repo}/archive/refs/tags/${tagName}.zip`;
+
     return {
-      version: release.tag_name.replace(/^v/i, ''),
-      name: release.name,
-      publishedAt: release.published_at,
-      downloadUrl: asset.browser_download_url,
-      size: asset.size,
+      version: tagName.replace(/^v/i, ''),
+      name: releaseData.name || repo,
+      publishedAt: releaseData.published_at || new Date().toISOString(),
+      downloadUrl,
+      size: asset?.size || 0,
     };
   }
 }

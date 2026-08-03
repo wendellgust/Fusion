@@ -74,8 +74,8 @@ const RootComponent = () => {
             onWidthChange={setLeftSidebarWidth}
             onToggle={toggleLeftSidebar}
           >
-            <SidebarNavigation isCompact={leftSidebar.isCollapsed}>
-              <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+            <SidebarNavigation isCompact={leftSidebar.isCollapsed} className="pb-28">
+              <div className="flex flex-1 flex-col gap-2 overflow-y-auto pb-6">
                 <SidebarNavigationItem
                   to="/dashboard"
                   icon={<GaugeIcon />}

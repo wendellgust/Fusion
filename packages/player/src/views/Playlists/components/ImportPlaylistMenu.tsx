@@ -1,17 +1,17 @@
 import { Import, Link } from 'lucide-react';
-import { type FC } from 'react';
+import { useState, type FC } from 'react';
 
 import { useTranslation } from '@nuclearplayer/i18n';
 import { Button, Popover } from '@nuclearplayer/ui';
 
-import { usePlaylistImport } from '../../../hooks/usePlaylistImport';
 import { useImportFromUrlContext } from '../PlaylistsContext';
+import { ImportFromJsonDialog } from './ImportFromJsonDialog';
 import { ImportFromUrlDialog } from './ImportFromUrlDialog';
 
 export const ImportPlaylistMenu: FC = () => {
   const { t } = useTranslation('playlists');
   const { openUrlDialog } = useImportFromUrlContext();
-  const { importFromJson } = usePlaylistImport();
+  const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
 
   return (
     <>
@@ -28,7 +28,7 @@ export const ImportPlaylistMenu: FC = () => {
         <Popover.Menu>
           <Popover.Item
             icon={<Import size={16} />}
-            onClick={importFromJson}
+            onClick={() => setIsJsonDialogOpen(true)}
             data-testid="import-json-option"
           >
             {t('importJson')}
@@ -42,6 +42,11 @@ export const ImportPlaylistMenu: FC = () => {
           </Popover.Item>
         </Popover.Menu>
       </Popover>
+
+      <ImportFromJsonDialog
+        isOpen={isJsonDialogOpen}
+        onClose={() => setIsJsonDialogOpen(false)}
+      />
       <ImportFromUrlDialog />
     </>
   );

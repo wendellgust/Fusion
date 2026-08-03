@@ -4,15 +4,17 @@ import '@nuclearplayer/tailwind-config';
 import '@nuclearplayer/themes';
 import '@nuclearplayer/i18n';
 
-const root = ReactDOM.createRoot(document.getElementById('root')!);
-const isTauri = !!(window as Window & { __TAURI_INTERNALS__?: unknown })
-  .__TAURI_INTERNALS__;
+import { setupTauriWebPolyfill } from './services/tauriWebPolyfill';
 
-// Dynamic imports avoid loading Tauri modules in the browser
-if (isTauri) {
-  const { initPlayerApp } = await import('./initPlayerApp');
-  await initPlayerApp(root);
-} else {
+setupTauriWebPolyfill();
+
+const root = ReactDOM.createRoot(document.getElementById('root')!);
+const isRemoteMode = new URLSearchParams(window.location.search).has('remote');
+
+if (isRemoteMode) {
   const { initRemoteApp } = await import('./remoteControl');
   initRemoteApp(root);
+} else {
+  const { initPlayerApp } = await import('./initPlayerApp');
+  await initPlayerApp(root);
 }

@@ -41,6 +41,65 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     }
   }, [crossfadeMs]);
 
+  // Hook up Web MediaSession API for iPhone / Android Lockscreen / Bluetooth Media Controls
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) {
+      return;
+    }
+
+    const currentItem = useQueueStore.getState().getCurrentItem();
+    const track = currentItem?.track;
+
+    if (track) {
+      const artistName =
+        (track as any).artist ||
+        (track as any).artists?.[0]?.name ||
+        'Unknown Artist';
+      const trackTitle =
+        (track as any).name || (track as any).title || 'Unknown Track';
+      const artworkUrl =
+        (track as any).thumbnail ||
+        (track as any).album?.artwork?.items?.[0]?.url ||
+        (track as any).album?.coverImage ||
+        '';
+
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: trackTitle,
+          artist: artistName,
+          album: (track as any).album?.title || (track as any).album || '',
+          artwork: artworkUrl
+            ? [{ src: artworkUrl, sizes: '512x512', type: 'image/jpeg' }]
+            : [],
+        });
+      } catch {
+        /* ignore invalid metadata */
+      }
+    }
+
+    try {
+      navigator.mediaSession.setActionHandler('play', () => {
+        useSoundStore.getState().play();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        useSoundStore.getState().pause();
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        useQueueStore.getState().goToPrevious();
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        useQueueStore.getState().goToNext();
+      });
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined) {
+          useSoundStore.getState().seekTo(details.seekTime);
+        }
+      });
+    } catch {
+      /* ignore unsupported actions */
+    }
+  }, [src, status]);
+
   const handleTimeUpdate = useCallback(
     ({ position, duration }: { position: number; duration: number }) => {
       useSoundStore.getState().updatePlayback(position, duration);
@@ -116,17 +175,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 1024;
 
-    // silentGain forces WebKit to keep the audio graph processing.
-    // Without any output path, WebKit suspends the graph even when ctx.state === 'running'.
     const silentGain = ctx.createGain();
     silentGain.gain.value = 0;
     analyser.connect(silentGain);
     silentGain.connect(ctx.destination);
 
-    // Always use a parallel element in bypass mode.
-    // - captureStream() doesn't capture GStreamer audio on Linux (bypass routes through GStreamer).
-    // - audioElement.src is a blob URL when protocol is 'mse' — unusable by a second element.
-    // - Use src.url (the actual proxy URL) instead; GStreamer in WebKitGTK plays fmp4 natively.
     const parallelEl = new Audio();
     parallelEl.src = src.url;
     parallelEl.crossOrigin = audioElement.crossOrigin || 'anonymous';

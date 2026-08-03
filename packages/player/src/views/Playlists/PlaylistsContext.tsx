@@ -1,27 +1,48 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { FC, PropsWithChildren } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type FC,
-  type PropsWithChildren,
-} from 'react';
 import { toast } from 'sonner';
 
 import { useTranslation } from '@nuclearplayer/i18n';
 import type { PlaylistProvider } from '@nuclearplayer/plugin-sdk';
-
 import { providersHost } from '../../services/providersHost';
-import { usePlaylistStore } from '../../stores/playlistStore';
 
 type CreatePlaylistContextValue = {
   isCreateDialogOpen: boolean;
   openCreateDialog: () => void;
   closeCreateDialog: () => void;
-  createPlaylist: (name: string) => Promise<void>;
+};
+
+const CreatePlaylistContext = createContext<CreatePlaylistContextValue | null>(null);
+
+export const useCreatePlaylistContext = () => {
+  const ctx = useContext(CreatePlaylistContext);
+  if (!ctx) {
+    throw new Error('useCreatePlaylistContext must be used within <PlaylistsProvider>');
+  }
+  return ctx;
+};
+
+const CreatePlaylistProvider: FC<PropsWithChildren> = ({ children }) => {
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  const openCreateDialog = useCallback(() => setIsCreateDialogOpen(true), []);
+  const closeCreateDialog = useCallback(() => setIsCreateDialogOpen(false), []);
+
+  const value = useMemo(
+    () => ({
+      isCreateDialogOpen,
+      openCreateDialog,
+      closeCreateDialog,
+    }),
+    [isCreateDialogOpen, openCreateDialog, closeCreateDialog]
+  );
+
+  return (
+    <CreatePlaylistContext.Provider value={value}>
+      {children}
+    </CreatePlaylistContext.Provider>
+  );
 };
 
 type ImportFromUrlContextValue = {
@@ -31,64 +52,14 @@ type ImportFromUrlContextValue = {
   importFromUrl: (url: string) => Promise<void>;
 };
 
-const CreatePlaylistContext = createContext<CreatePlaylistContextValue | null>(
-  null,
-);
-
-const ImportFromUrlContext = createContext<ImportFromUrlContextValue | null>(
-  null,
-);
-
-export const useCreatePlaylistContext = () => {
-  const ctx = useContext(CreatePlaylistContext);
-  if (!ctx) {
-    throw new Error(
-      'useCreatePlaylistContext must be used within <PlaylistsProvider>',
-    );
-  }
-  return ctx;
-};
+const ImportFromUrlContext = createContext<ImportFromUrlContextValue | null>(null);
 
 export const useImportFromUrlContext = () => {
   const ctx = useContext(ImportFromUrlContext);
   if (!ctx) {
-    throw new Error(
-      'useImportFromUrlContext must be used within <PlaylistsProvider>',
-    );
+    throw new Error('useImportFromUrlContext must be used within <PlaylistsProvider>');
   }
   return ctx;
-};
-
-const CreatePlaylistProvider: FC<PropsWithChildren> = ({ children }) => {
-  const storeCreatePlaylist = usePlaylistStore((state) => state.createPlaylist);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-
-  const openCreateDialog = useCallback(() => setIsCreateDialogOpen(true), []);
-  const closeCreateDialog = useCallback(() => setIsCreateDialogOpen(false), []);
-
-  const createPlaylist = useCallback(
-    async (name: string) => {
-      await storeCreatePlaylist(name);
-      setIsCreateDialogOpen(false);
-    },
-    [storeCreatePlaylist],
-  );
-
-  const value = useMemo(
-    () => ({
-      isCreateDialogOpen,
-      openCreateDialog,
-      closeCreateDialog,
-      createPlaylist,
-    }),
-    [isCreateDialogOpen, openCreateDialog, closeCreateDialog, createPlaylist],
-  );
-
-  return (
-    <CreatePlaylistContext.Provider value={value}>
-      {children}
-    </CreatePlaylistContext.Provider>
-  );
 };
 
 const ImportFromUrlProvider: FC<PropsWithChildren> = ({ children }) => {
@@ -103,7 +74,7 @@ const ImportFromUrlProvider: FC<PropsWithChildren> = ({ children }) => {
     async (url: string) => {
       const providers = providersHost.list('playlists') as PlaylistProvider[];
       const matchingProvider = providers.find((provider) =>
-        provider.matchesUrl(url),
+        provider.matchesUrl(url)
       );
 
       if (!matchingProvider) {
@@ -118,7 +89,7 @@ const ImportFromUrlProvider: FC<PropsWithChildren> = ({ children }) => {
         search: { url: encodeURIComponent(url) },
       });
     },
-    [navigate, t],
+    [navigate, t]
   );
 
   const value = useMemo(
@@ -128,7 +99,7 @@ const ImportFromUrlProvider: FC<PropsWithChildren> = ({ children }) => {
       closeUrlDialog,
       importFromUrl,
     }),
-    [isUrlDialogOpen, openUrlDialog, closeUrlDialog, importFromUrl],
+    [isUrlDialogOpen, openUrlDialog, closeUrlDialog, importFromUrl]
   );
 
   return (
@@ -140,47 +111,160 @@ const ImportFromUrlProvider: FC<PropsWithChildren> = ({ children }) => {
 
 export const PlaylistsProvider: FC<PropsWithChildren> = ({ children }) => {
   useEffect(() => {
-    const youtubePlaylistProvider: PlaylistProvider = {
-      id: 'built-in-youtube-playlist',
-      kind: 'playlists',
-      name: 'YouTube Playlist',
-      matchesUrl: (url: string) => {
-        return (
-          url.includes('youtube.com/playlist') ||
-          url.includes('youtu.be/playlist') ||
-          (url.includes('youtube.com/') && url.includes('list=')) ||
-          (url.includes('music.youtube.com/') && url.includes('list='))
-        );
-      },
-      fetchPlaylistByUrl: async (url: string) => {
+    const fetchYouTubePlaylist = async (url: string) => {
+      const nowIso = new Date().toISOString();
+      const listMatch = url.match(/[?&]list=([^&]+)/);
+      const cleanListId = listMatch ? listMatch[1] : '';
+      const cleanUrl = cleanListId
+        ? `https://www.youtube.com/playlist?list=${cleanListId}`
+        : url;
+
+      // 1. Fetch via local server /api/yt-playlist endpoint
+      try {
+        const res = await fetch(`/api/yt-playlist?url=${encodeURIComponent(cleanUrl)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const entries = Array.isArray(data?.entries) ? data.entries : [];
+          if (entries.length > 0) {
+            const items = entries.map((e: any, index: number) => ({
+              id: `yt-${e.id || index}-${index}`,
+              addedAtIso: nowIso,
+              track: {
+                title: e.title || 'Unknown Track',
+                artists: e.artist ? [{ name: e.artist, roles: ['main'] }] : [{ name: 'Unknown Artist', roles: ['main'] }],
+                durationMs: e.duration ? Math.round(e.duration * 1000) : undefined,
+                artwork: e.thumbnail ? { items: [{ url: e.thumbnail, purpose: 'thumbnail' }] } : undefined,
+                source: {
+                  provider: 'built-in-web-streaming',
+                  id: `${e.artist || ''} ${e.title || ''}`.trim(),
+                },
+              },
+            }));
+
+            return {
+              id: cleanListId || data.id || url,
+              name: data.title || 'YouTube Playlist',
+              createdAtIso: nowIso,
+              lastModifiedIso: nowIso,
+              isReadOnly: false,
+              items,
+            };
+          }
+        }
+      } catch {
+        /* try next fallback */
+      }
+
+      // 2. Try Invidious API fallbacks if listId is present
+      if (cleanListId) {
+        const invidiousEndpoints = [
+          'https://inv.tux.pizza/api/v1/playlists/',
+          'https://invidious.nerdvpn.de/api/v1/playlists/',
+        ];
+
+        for (const endpoint of invidiousEndpoints) {
+          try {
+            const res = await fetch(`/api/proxy-download?url=${encodeURIComponent(endpoint + cleanListId)}`);
+            if (res.ok) {
+              const data = await res.json();
+              const videos = Array.isArray(data?.videos) ? data.videos : [];
+              if (videos.length > 0) {
+                const items = videos.map((v: any, index: number) => ({
+                  id: `yt-${v.videoId || index}-${index}`,
+                  addedAtIso: nowIso,
+                  track: {
+                    title: v.title || 'Unknown Track',
+                    artists: [{ name: v.author || 'Unknown Artist', roles: ['main'] }],
+                    durationMs: v.lengthSeconds ? Math.round(v.lengthSeconds * 1000) : undefined,
+                    artwork: Array.isArray(v.videoThumbnails) && v.videoThumbnails.length > 0
+                      ? { items: [{ url: v.videoThumbnails[0].url, purpose: 'thumbnail' }] }
+                      : undefined,
+                    source: {
+                      provider: 'built-in-web-streaming',
+                      id: `${v.author || ''} ${v.title || ''}`.trim(),
+                    },
+                  },
+                }));
+
+                return {
+                  id: cleanListId,
+                  name: data.title || 'YouTube Playlist',
+                  createdAtIso: nowIso,
+                  lastModifiedIso: nowIso,
+                  isReadOnly: false,
+                  items,
+                };
+              }
+            }
+          } catch {
+            /* try next instance */
+          }
+        }
+      }
+
+      // 3. Fallback for Tauri desktop
+      try {
         const { invoke } = await import('@tauri-apps/api/core');
-        const info = await invoke<any>('ytdlp_get_playlist', { url });
-        const nowIso = new Date().toISOString();
+        const info = await invoke<any>('ytdlp_get_playlist', { url: cleanUrl });
+        const entries = Array.isArray(info?.entries) ? info.entries : [];
         return {
-          id: info.id || url,
-          name: info.title || 'YouTube Playlist',
+          id: info?.id || url,
+          name: info?.title || 'YouTube Playlist',
           createdAtIso: nowIso,
           lastModifiedIso: nowIso,
           isReadOnly: true,
-          items: (info.entries || []).map((entry: any, index: number) => ({
-            id: crypto.randomUUID ? crypto.randomUUID() : `yt-${entry.id}-${index}`,
-            addedAtIso: nowIso,
-            track: {
-              title: entry.title || 'Unknown Track',
-              artists: entry.channel ? [{ name: entry.channel, roles: ['main'] }] : [],
-              durationMs: entry.duration ? Math.round(entry.duration * 1000) : undefined,
-              artwork: entry.thumbnails && entry.thumbnails.length > 0
-                ? { items: entry.thumbnails.map((t: any) => ({ url: t.url, purpose: 'thumbnail' })) }
-                : undefined,
-              source: {
-                provider: 'youtube',
-                id: entry.id,
-              }
-            }
-          }))
+          items: entries.map((entry: any, index: number) => {
+            const thumbs = Array.isArray(entry?.thumbnails) ? entry.thumbnails : [];
+            return {
+              id: `yt-${entry?.id || index}-${index}`,
+              addedAtIso: nowIso,
+              track: {
+                title: entry?.title || 'Unknown Track',
+                artists: entry?.channel ? [{ name: entry.channel, roles: ['main'] }] : [],
+                durationMs: entry?.duration ? Math.round(entry.duration * 1000) : undefined,
+                artwork: thumbs.length > 0
+                  ? { items: thumbs.map((t: any) => ({ url: t.url, purpose: 'thumbnail' })) }
+                  : undefined,
+                source: {
+                  provider: 'youtube',
+                  id: entry?.id || '',
+                },
+              },
+            };
+          }),
+        };
+      } catch {
+        return {
+          id: url,
+          name: 'YouTube Playlist',
+          createdAtIso: nowIso,
+          lastModifiedIso: nowIso,
+          isReadOnly: false,
+          items: [],
         };
       }
     };
+
+    const matchesYouTubeUrl = (url: string) => {
+      return (
+        url.includes('youtube.com/playlist') ||
+        url.includes('youtu.be/playlist') ||
+        (url.includes('youtube.com/') && url.includes('list=')) ||
+        (url.includes('music.youtube.com/') && url.includes('list='))
+      );
+    };
+
+    // Register YouTube provider under all matching IDs used across Nuclear UI routes
+    const youtubeProviderIds = ['built-in-youtube-playlist', 'youtube-playlists', 'youtube-playlist', 'youtube'];
+    for (const providerId of youtubeProviderIds) {
+      providersHost.register({
+        id: providerId,
+        kind: 'playlists',
+        name: 'YouTube Playlist',
+        matchesUrl: matchesYouTubeUrl,
+        fetchPlaylistByUrl: fetchYouTubePlaylist,
+      } as PlaylistProvider);
+    }
 
     const spotifyPlaylistProvider: PlaylistProvider = {
       id: 'built-in-spotify-playlist',
@@ -199,12 +283,12 @@ export const PlaylistsProvider: FC<PropsWithChildren> = ({ children }) => {
         }
         const playlistId = playlistIdMatch[1];
         const embedUrl = `https://open.spotify.com/embed/playlist/${playlistId}`;
-        
+
         const { httpHost } = await import('../../services/httpHost');
         const response = await httpHost.fetch(embedUrl, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-          }
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
         });
 
         if (response.status !== 200) {
@@ -218,104 +302,37 @@ export const PlaylistsProvider: FC<PropsWithChildren> = ({ children }) => {
         }
 
         const nextData = JSON.parse(match[1]);
-        const pageProps = nextData.props?.pageProps;
-        if (!pageProps) {
-          throw new Error('Invalid metadata format in Spotify embed page');
-        }
+        const entity = nextData.props.pageProps.state.data.entity;
 
-        if (pageProps.status === 404) {
-          throw new Error('Spotify playlist not found or is private');
-        }
-
-        // Helper function to recursively find tracks array
-        const findTracks = (obj: any): any[] | null => {
-          if (!obj || typeof obj !== 'object') {
-            return null;
-          }
-          if (Array.isArray(obj)) {
-            const isTrackList = obj.some(item => {
-              if (!item) return false;
-              if (item.uri && item.uri.startsWith('spotify:track:')) return true;
-              if (item.track && item.track.uri && item.track.uri.startsWith('spotify:track:')) return true;
-              return false;
-            });
-            if (isTrackList) {
-              return obj;
-            }
-            for (const item of obj) {
-              const found = findTracks(item);
-              if (found) return found;
-            }
-          } else {
-            for (const key of Object.keys(obj)) {
-              const found = findTracks(obj[key]);
-              if (found) return found;
-            }
-          }
-          return null;
-        };
-
-        const rawTracks = findTracks(pageProps) || [];
         const nowIso = new Date().toISOString();
-
-        const getPlaylistTitle = () => {
-          if (pageProps.title && pageProps.title !== 'Page not found') {
-            return pageProps.title;
-          }
-          if (pageProps.state?.data?.entity?.name) {
-            return pageProps.state.data.entity.name;
-          }
-          return 'Spotify Playlist';
-        };
-
-        const playlistTitle = getPlaylistTitle();
-
-        const items = rawTracks.map((item: any, index: number) => {
-          const t = item.track || item;
-          const trackId = t.id || (t.uri ? t.uri.split(':').pop() : `sp-${index}`);
-          return {
-            id: crypto.randomUUID ? crypto.randomUUID() : `sp-item-${trackId}-${index}`,
-            addedAtIso: nowIso,
-            track: {
-              title: t.name || t.title || 'Unknown Track',
-              artists: Array.isArray(t.artists)
-                ? t.artists.map((a: any) => ({ name: a.name, roles: ['main'] }))
-                : [],
-              album: t.album
-                ? {
-                    title: t.album.name || t.album.title || '',
-                    source: { provider: 'spotify', id: t.album.uri || '' },
-                  }
-                : undefined,
-              durationMs: t.duration_ms || t.duration || undefined,
-              artwork: t.album && Array.isArray(t.album.images) && t.album.images.length > 0
-                ? { items: t.album.images.map((img: any) => ({ url: img.url, purpose: 'thumbnail' })) }
-                : undefined,
-              source: {
-                provider: 'spotify',
-                id: trackId,
-              }
-            }
-          };
-        });
-
         return {
-          id: playlistId,
-          name: playlistTitle,
+          id: entity.id || playlistId,
+          name: entity.name || 'Spotify Playlist',
+          description: entity.description || '',
           createdAtIso: nowIso,
           lastModifiedIso: nowIso,
           isReadOnly: true,
-          items,
+          items: (entity.trackList || []).map((item: any, index: number) => ({
+            id: `sp-${item.uri || index}`,
+            addedAtIso: nowIso,
+            track: {
+              title: item.title || 'Unknown Track',
+              artists: item.subtitle ? [{ name: item.subtitle, roles: ['main'] }] : [],
+              durationMs: item.duration ? Math.round(item.duration) : undefined,
+              artwork: item.audio
+                ? { items: [{ url: item.audio, purpose: 'thumbnail' }] }
+                : undefined,
+              source: {
+                provider: 'built-in-web-streaming',
+                id: `${item.subtitle || ''} ${item.title || ''}`.trim(),
+              },
+            },
+          })),
         };
-      }
+      },
     };
 
-    if (!providersHost.get('built-in-youtube-playlist', 'playlists')) {
-      providersHost.register(youtubePlaylistProvider);
-    }
-    if (!providersHost.get('built-in-spotify-playlist', 'playlists')) {
-      providersHost.register(spotifyPlaylistProvider);
-    }
+    providersHost.register(spotifyPlaylistProvider);
   }, []);
 
   return (

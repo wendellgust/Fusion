@@ -9,11 +9,13 @@ import { PlaylistActions } from '../Playlists/components/PlaylistActions';
 
 type PlaylistImportActionsProps = {
   tracks: Track[];
+  title?: string;
   onSaveLocally: () => void;
 };
 
 export const PlaylistImportActions: FC<PlaylistImportActionsProps> = ({
   tracks,
+  title,
   onSaveLocally,
 }) => {
   const { t } = useTranslation('playlists');
@@ -21,6 +23,7 @@ export const PlaylistImportActions: FC<PlaylistImportActionsProps> = ({
   return (
     <PlaylistActions
       tracks={tracks}
+      title={title}
       menuItems={
         <Popover.Item
           icon={<SaveIcon size={16} />}

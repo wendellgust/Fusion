@@ -1,5 +1,6 @@
-import { AlertCircle, Package } from 'lucide-react';
+import { AlertCircle, Download, Package } from 'lucide-react';
 import { FC, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 import { useTranslation } from '@nuclearplayer/i18n';
 import {
@@ -39,6 +40,7 @@ export const PluginStore: FC = () => {
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string>(CATEGORY_ALL);
+  const [isInstallingAll, setIsInstallingAll] = useState(false);
 
   const categoryItems = useMemo(
     () =>
@@ -80,6 +82,27 @@ export const PluginStore: FC = () => {
   const isPluginInstalling = (plugin: MarketplacePlugin) =>
     isPending && variables?.plugin.id === plugin.id;
 
+  const handleInstallAll = async () => {
+    if (!plugins || plugins.length === 0) return;
+    const uninstalled = plugins.filter((p) => !(p.id in installedPlugins));
+    if (uninstalled.length === 0) {
+      toast.info('All plugins are already installed!');
+      return;
+    }
+
+    setIsInstallingAll(true);
+    toast.info(`Starting download of ${uninstalled.length} plugins...`);
+    for (const plugin of uninstalled) {
+      try {
+        await installPlugin({ plugin });
+      } catch {
+        /* continue installing next */
+      }
+    }
+    setIsInstallingAll(false);
+    toast.success('All plugins downloaded and installed!');
+  };
+
   if (isLoading) {
     return <CenteredLoader />;
   }
@@ -102,11 +125,25 @@ export const PluginStore: FC = () => {
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-hidden">
       <div className="flex flex-col gap-3">
-        <Input
-          placeholder={t('store.searchPlaceholder')}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <Input
+              placeholder={t('store.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={isInstallingAll || isPending}
+            onClick={handleInstallAll}
+            className="shrink-0 gap-2 font-bold"
+          >
+            <Download size={16} />
+            {isInstallingAll ? 'Downloading All...' : 'Download All Plugins'}
+          </Button>
+        </div>
         <FilterChips
           items={categoryItems}
           selected={category}

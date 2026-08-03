@@ -3,21 +3,22 @@ import { useState, type FC } from 'react';
 import { useTranslation } from '@nuclearplayer/i18n';
 import { Button, Dialog, Input } from '@nuclearplayer/ui';
 
+import { usePlaylistStore } from '../../../stores/playlistStore';
 import { useCreatePlaylistContext } from '../PlaylistsContext';
 
 export const CreatePlaylistDialog: FC = () => {
   const { t } = useTranslation('playlists');
-  const { isCreateDialogOpen, closeCreateDialog, createPlaylist } =
-    useCreatePlaylistContext();
+  const { isCreateDialogOpen, closeCreateDialog } = useCreatePlaylistContext();
+  const createPlaylist = usePlaylistStore((state) => state.createPlaylist);
   const [name, setName] = useState('');
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
       return;
     }
-    createPlaylist(trimmed);
-    setName('');
+    await createPlaylist(trimmed);
+    handleClose();
   };
 
   const handleClose = () => {

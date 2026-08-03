@@ -1,7 +1,7 @@
 import { useParams, useSearch } from '@tanstack/react-router';
 import { useCallback, useMemo, type FC } from 'react';
 
-import { ScrollableArea } from '@nuclearplayer/ui';
+import { CenteredLoader } from '@nuclearplayer/ui';
 
 import { ConnectedTrackTable } from '../../components/ConnectedTrackTable';
 import { buildThumbnails } from '../../services/playlistFileService/buildThumbnails';
@@ -16,7 +16,7 @@ export const PlaylistImport: FC = () => {
   });
   const { url } = useSearch({ from: '/playlists/import/$providerId' });
 
-  const { playlist, items, tracks } = usePlaylistFromProvider(providerId, url);
+  const { playlist, items, tracks, isLoading } = usePlaylistFromProvider(providerId, url);
   const { saveLocally } = useSaveLocally(playlist);
 
   const thumbnails = useMemo(
@@ -30,21 +30,31 @@ export const PlaylistImport: FC = () => {
   );
 
   return (
-    <ScrollableArea
-      className="bg-background"
+    <div
+      className="bg-background flex h-full flex-col overflow-hidden"
       data-testid="playlist-import-view"
     >
+      {isLoading && (
+        <div className="flex h-64 items-center justify-center">
+          <CenteredLoader />
+        </div>
+      )}
       {playlist && (
-        <PlaylistDetailHeader
-          playlist={playlist}
-          thumbnails={thumbnails}
-          className="mx-6 mt-6"
-        >
-          <PlaylistImportActions tracks={tracks} onSaveLocally={saveLocally} />
-        </PlaylistDetailHeader>
+        <div className="shrink-0 p-6 pb-2">
+          <PlaylistDetailHeader
+            playlist={playlist}
+            thumbnails={thumbnails}
+          >
+            <PlaylistImportActions
+              tracks={tracks}
+              title={playlist.name}
+              onSaveLocally={saveLocally}
+            />
+          </PlaylistDetailHeader>
+        </div>
       )}
       {tracks.length > 0 && (
-        <div className="h-full p-6">
+        <div className="min-h-0 flex-1 px-6 pb-6">
           <ConnectedTrackTable
             tracks={tracks}
             getItemId={getItemId}
@@ -59,6 +69,6 @@ export const PlaylistImport: FC = () => {
           />
         </div>
       )}
-    </ScrollableArea>
+    </div>
   );
 };

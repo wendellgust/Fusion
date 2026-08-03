@@ -12,6 +12,15 @@ import { stripResolutionState } from '@nuclearplayer/model';
 import { playlistFileService } from '../services/playlistFileService';
 import { useQueueStore } from './queueStore';
 
+async function syncServer() {
+  try {
+    const { useAuthStore } = await import('../services/authService');
+    await useAuthStore.getState().syncDataToServer();
+  } catch {
+    /* ignore */
+  }
+}
+
 type PlaylistStore = {
   index: PlaylistIndexEntry[];
   playlists: Map<string, Playlist>;
@@ -81,6 +90,8 @@ export const usePlaylistStore = create<PlaylistStore>((set, get) => ({
       index,
     }));
 
+    void syncServer();
+
     return playlist.id;
   },
 
@@ -100,6 +111,8 @@ export const usePlaylistStore = create<PlaylistStore>((set, get) => ({
       playlists: new Map(state.playlists).set(imported.id, imported),
       index,
     }));
+
+    void syncServer();
 
     return imported.id;
   },
@@ -130,6 +143,8 @@ export const usePlaylistStore = create<PlaylistStore>((set, get) => ({
       index,
     }));
 
+    void syncServer();
+
     return newItems;
   },
 
@@ -152,6 +167,8 @@ export const usePlaylistStore = create<PlaylistStore>((set, get) => ({
       playlists: new Map(state.playlists).set(playlistId, updated),
       index,
     }));
+
+    void syncServer();
   },
 
   reorderTracks: async (playlistId: string, from: number, to: number) => {
@@ -176,6 +193,8 @@ export const usePlaylistStore = create<PlaylistStore>((set, get) => ({
 
     const index = await playlistFileService.savePlaylist(updated);
     set({ index });
+
+    void syncServer();
   },
 
   saveQueueAsPlaylist: async (name: string) => {
@@ -204,6 +223,8 @@ export const usePlaylistStore = create<PlaylistStore>((set, get) => ({
       index,
     }));
 
+    void syncServer();
+
     return playlist.id;
   },
 
@@ -225,6 +246,8 @@ export const usePlaylistStore = create<PlaylistStore>((set, get) => ({
       playlists: new Map(state.playlists).set(id, updated),
       index,
     }));
+
+    void syncServer();
   },
 
   deletePlaylist: async (id: string) => {
@@ -235,6 +258,8 @@ export const usePlaylistStore = create<PlaylistStore>((set, get) => ({
       playlists.delete(id);
       return { playlists, index };
     });
+
+    void syncServer();
   },
 }));
 

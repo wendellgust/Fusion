@@ -23,7 +23,7 @@ const AddToQueueButton: FC<AddToQueueButtonProps> = ({ onClick }) => (
     data-testid="add-to-queue-button"
     size="icon-sm"
     variant="text"
-    className="opacity-0 transition-none group-hover:opacity-100"
+    className="opacity-70 hover:opacity-100 transition-opacity"
     onClick={(e) => {
       e.stopPropagation();
       onClick();
@@ -43,11 +43,14 @@ const ContextMenuButton = forwardRef<HTMLElement>(
         data-testid="track-context-menu-button"
         size="icon-sm"
         variant="text"
-        className="opacity-0 transition-none group-hover:opacity-100"
-        onClick={(e) => e.stopPropagation()}
+        className="opacity-80 hover:opacity-100 transition-opacity p-1 text-slate-300 hover:text-white"
+        onClick={(e) => {
+          e.stopPropagation();
+          (props as any).onClick?.(e);
+        }}
         aria-label="Track options"
       >
-        <EllipsisVertical size={16} />
+        <EllipsisVertical size={18} />
       </Button>
     );
   },
@@ -60,7 +63,6 @@ export const TitleCell = <T extends Track>({
 }: CellContext<T, string | number | undefined>) => {
   const meta = table.options.meta as TitleCellMeta | undefined;
   const { actions } = useTrackTableContext<T>();
-  const showControls = meta?.displayQueueControls;
   const ContextMenuWrapper = meta?.ContextMenuWrapper;
   const track = row.original;
   const hasAddToQueue = Boolean(meta?.onAddToQueue);
@@ -71,7 +73,7 @@ export const TitleCell = <T extends Track>({
     <td className="truncate px-2">
       <div className="flex items-center justify-between gap-2">
         <button
-          className="min-w-0 flex-1 cursor-pointer truncate text-left hover:underline"
+          className="min-w-0 flex-1 cursor-pointer truncate text-left hover:underline font-medium"
           onClick={(e) => {
             e.stopPropagation();
             actions.onPlayNow?.(track);
@@ -79,7 +81,7 @@ export const TitleCell = <T extends Track>({
         >
           {getValue()}
         </button>
-        {showControls && hasActions && (
+        {hasActions && (
           <div className="flex items-center gap-1">
             {hasAddToQueue && (
               <AddToQueueButton onClick={() => meta?.onAddToQueue?.(track)} />

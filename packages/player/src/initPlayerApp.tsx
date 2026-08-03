@@ -4,6 +4,7 @@ import App from './App';
 import { initLogStream } from './hooks/useLogStream';
 import { startAdvancedThemeWatcher } from './services/advancedThemeDirService';
 import { applyAdvancedThemeFromSettingsIfAny } from './services/advancedThemeService';
+import { registerBuiltInWebProviders } from './services/builtInWebProviders';
 import { initBridgeHandler } from './services/bridge/bridgeHandler';
 import { registerBuiltInCoreSettings } from './services/coreSettings';
 import { initDiscordHandler } from './services/discordHandler';
@@ -17,11 +18,7 @@ import { loadMarketplaceThemes } from './services/marketplaceThemeDirService';
 import { initMcpHandler } from './services/mcp';
 import { initMpdHandler } from './services/mpd';
 import { hydratePluginsFromRegistry } from './services/plugins/pluginBootstrap';
-import { ytdlpEnsureInstalled } from './services/tauri/commands';
-import {
-  applyYtdlpSettingsFromStore,
-  initYtdlpSettingsWatcher,
-} from './services/ytdlpService';
+import { setupTauriWebPolyfill } from './services/tauriWebPolyfill';
 import { initializeFavoritesStore } from './stores/favoritesStore';
 import { initializePlaylistStore } from './stores/playlistStore';
 import { initializeQueueStore } from './stores/queueStore';
@@ -29,43 +26,42 @@ import { initializeRadioStore } from './stores/radioStore';
 import { initializeSettingsStore } from './stores/settingsStore';
 import { initializeShortcutsStore } from './stores/shortcutsStore';
 import { hydrateThemeStore } from './stores/themeStore';
-import { useUpdaterStore } from './stores/updaterStore';
 import { initializeBlockStore } from './stores/blockStore';
 import { initializeStatsStore } from './stores/statsStore';
 
 export const initPlayerApp = async (
   root: ReturnType<typeof import('react-dom/client').createRoot>,
 ) => {
+  setupTauriWebPolyfill();
   initLogStream();
 
-  await initializeSettingsStore()
-    .then(() => initializeShortcutsStore())
-    .then(() => initializeQueueStore())
-    .then(() => initializeBlockStore())
-    .then(() => initializeStatsStore())
-    .then(() => initializeFavoritesStore())
-    .then(() => initializePlaylistStore())
-    .then(() => initializeRadioStore())
-    .then(() => registerBuiltInCoreSettings())
-    .then(() => initDiscoveryService())
-    .then(() => initMcpHandler())
-    .then(() => initMpdHandler())
-    .then(() => initHttpApiHandler())
-    .then(() => initBridgeHandler())
-    .then(() => initDiscordHandler())
-    .then(() => applyLanguageFromSettings())
-    .then(() => initLanguageWatcher())
-    .then(() => applyYtdlpSettingsFromStore())
-    .then(() => initYtdlpSettingsWatcher())
-    .then(() => startAdvancedThemeWatcher())
-    .then(() => loadMarketplaceThemes())
-    .then(() => hydrateThemeStore())
-    .then(() => applyAdvancedThemeFromSettingsIfAny())
-    .then(() => {
-      void hydratePluginsFromRegistry();
-      void useUpdaterStore.getState().checkForUpdate();
-      void ytdlpEnsureInstalled();
-    });
+  try {
+    await initializeSettingsStore().catch(() => {});
+    await initializeShortcutsStore().catch(() => {});
+    await initializeQueueStore().catch(() => {});
+    await initializeBlockStore().catch(() => {});
+    await initializeStatsStore().catch(() => {});
+    await initializeFavoritesStore().catch(() => {});
+    await initializePlaylistStore().catch(() => {});
+    await initializeRadioStore().catch(() => {});
+    registerBuiltInCoreSettings();
+    initDiscoveryService();
+    registerBuiltInWebProviders();
+    await initMcpHandler().catch(() => {});
+    await initMpdHandler().catch(() => {});
+    await initHttpApiHandler().catch(() => {});
+    await initBridgeHandler().catch(() => {});
+    initDiscordHandler();
+    await applyLanguageFromSettings().catch(() => {});
+    initLanguageWatcher();
+    await startAdvancedThemeWatcher().catch(() => {});
+    await loadMarketplaceThemes().catch(() => {});
+    hydrateThemeStore();
+    await applyAdvancedThemeFromSettingsIfAny().catch(() => {});
+    void hydratePluginsFromRegistry();
+  } catch (err) {
+    console.warn('Initialization warning in web mode:', err);
+  }
 
   root.render(
     <React.StrictMode>

@@ -23,6 +23,7 @@ export const useInstallPlugin = () => {
   const { t } = useTranslation('plugins');
   const loadPluginFromPath = usePluginStore((s) => s.loadPluginFromPath);
   const enablePlugin = usePluginStore((s) => s.enablePlugin);
+  const unloadPlugin = usePluginStore((s) => s.unloadPlugin);
 
   return useMutation({
     mutationFn: async ({ plugin }: InstallPluginParams) => {
@@ -44,6 +45,10 @@ export const useInstallPlugin = () => {
           installedAt: now,
           lastUpdatedAt: now,
         });
+
+        if (usePluginStore.getState().plugins[plugin.id]) {
+          await unloadPlugin(plugin.id).catch(() => {});
+        }
 
         await loadPluginFromPath(extractedPath);
         await enablePlugin(plugin.id);

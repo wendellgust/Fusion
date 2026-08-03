@@ -6,7 +6,9 @@ import type { TFunction } from '@nuclearplayer/i18n';
 import { useTranslation } from '@nuclearplayer/i18n';
 import type { QueueItem, StreamCandidate, Track } from '@nuclearplayer/model';
 
+import { webStreamingProvider } from '../services/builtInWebProviders';
 import { streamingHost } from '../services/streamingHost';
+import { isTauriDesktop } from '../services/tauriWebPolyfill';
 import { useBlockStore } from '../stores/blockStore';
 import { useQueueStore } from '../stores/queueStore';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -19,7 +21,7 @@ const getStreamServerPort = async (): Promise<number> => {
   if (cachedStreamServerPort === null) {
     cachedStreamServerPort = await invoke<number>('stream_server_port');
   }
-  return cachedStreamServerPort;
+  return cachedStreamServerPort || 9100;
 };
 
 // Encode the URL in base64 and proxy through the local streaming server to bypass CORS
@@ -46,8 +48,13 @@ const isFmp4Stream = (stream: StreamCandidate['stream']): boolean => {
 const buildAudioSource = async (
   candidate: StreamCandidate,
 ): Promise<AudioSource> => {
-  const { stream } = candidate;
-  if (!stream) {
+  const stream = candidate.stream;
+
+  if (!stream || !stream.url) {
+    if (!isTauriDesktop()) {
+      const resolved = await webStreamingProvider.getStreamUrl(candidate.id);
+      return { url: resolved.url, protocol: 'http' };
+    }
     return { url: candidate.id, protocol: 'http' };
   }
 
@@ -55,20 +62,34 @@ const buildAudioSource = async (
     return { url: stream.url, protocol: 'hls' };
   }
 
-  const port = await getStreamServerPort();
-  const proxyUrl = proxyStreamUrl(stream.url, port);
+  if (isTauriDesktop()) {
+    const port = await getStreamServerPort();
+    const proxyUrl = proxyStreamUrl(stream.url, port);
 
-  const durationMs = stream.durationMs ?? candidate.durationMs;
-  if (isFmp4Stream(stream) && durationMs) {
-    return {
-      url: proxyUrl,
-      protocol: 'mse',
-      durationSeconds: durationMs / 1000,
-      codec: stream.codec,
-    };
+    const durationMs = stream.durationMs ?? candidate.durationMs;
+    if (isFmp4Stream(stream) && durationMs) {
+      return {
+        url: proxyUrl,
+        protocol: 'mse',
+        durationSeconds: durationMs / 1000,
+        codec: stream.codec,
+      };
+    }
+
+    return { url: proxyUrl, protocol: stream.protocol };
   }
 
-  return { url: proxyUrl, protocol: stream.protocol };
+  // Web Browser Mode
+  let webUrl = stream.url;
+  if (!webUrl.startsWith('http://') && !webUrl.startsWith('https://') && !webUrl.startsWith('/api/')) {
+    const resolved = await webStreamingProvider.getStreamUrl(webUrl);
+    webUrl = resolved.url;
+  } else if (webUrl.startsWith('http://') || webUrl.startsWith('https://')) {
+    if (typeof window !== 'undefined' && !webUrl.startsWith(window.location.origin)) {
+      webUrl = `/api/proxy-audio?url=${encodeURIComponent(webUrl)}`;
+    }
+  }
+  return { url: webUrl, protocol: 'http' };
 };
 
 const setItemError = (itemId: string, errorKey: string, t: TFunction): void => {

@@ -28,6 +28,7 @@ export const ConnectedTrackTable: FC<ConnectedTrackTableProps> = (props) => {
       {...restProps}
       display={{
         displayFavorite: true,
+        displayQueueControls: true,
         ...restProps.display,
       }}
       actions={{

@@ -32,7 +32,7 @@ export const PlaylistDetail: FC = () => {
           thumbnails={thumbnails}
           className="mx-6 mt-6"
         >
-          <PlaylistDetailActions playlistId={playlistId} tracks={tracks} />
+          <PlaylistDetailActions playlistId={playlistId} tracks={tracks} title={playlist.name} />
         </PlaylistDetailHeader>
       )}
       {isEmpty(tracks) ? (

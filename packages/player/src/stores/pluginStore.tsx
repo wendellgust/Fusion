@@ -88,9 +88,10 @@ const loadPluginData = async (
     );
   }
 
+  const api = createPluginAPI(id, metadata.displayName);
   const managedPath = await installPluginToManagedDir(id, version, sourcePath);
   const managedPluginLoader = new PluginLoader(managedPath);
-  const { instance } = await managedPluginLoader.load();
+  const { instance } = await managedPluginLoader.load(api);
 
   return { metadata, managedPath, instance, warnings };
 };
@@ -105,8 +106,8 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
       const metadata = await loader.loadMetadata();
       const id = metadata.id;
 
-      if (get().plugins[id]) {
-        Logger.plugins.debug(`Plugin ${id} already loaded, skipping`);
+      if (get().plugins[id] && get().plugins[id].instance) {
+        Logger.plugins.debug(`Plugin ${id} already loaded with valid instance, skipping`);
         return;
       }
 
@@ -175,6 +176,7 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
         userMessage: 'Failed to load plugin',
         error,
       });
+      throw error;
     }
   },
 
@@ -245,10 +247,7 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
       unloadError = error;
     }
 
-    // Plugin will be removed regardless of unload errors
     set((state) => {
-      // _removed is intentionally unused
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { [id]: _removed, ...rest } = state.plugins;
       return { plugins: rest };
     });

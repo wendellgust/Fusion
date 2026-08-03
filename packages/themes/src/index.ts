@@ -106,6 +106,9 @@ export function listBasicThemes(): BasicThemeMeta[] {
 export function setThemeId(id: string): void {
   const root = document.documentElement;
   root.setAttribute('data-theme-id', id);
+  if (!root.getAttribute('data-theme')) {
+    root.setAttribute('data-theme', 'dark');
+  }
 }
 
 export function setBasicTheme(id: string): void {

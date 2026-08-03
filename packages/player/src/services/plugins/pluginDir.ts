@@ -33,6 +33,9 @@ export const installPluginToManagedDir = async (
   version: string,
   fromPath: string,
 ): Promise<string> => {
+  if (fromPath.startsWith('web_plugin:')) {
+    return fromPath;
+  }
   Logger.plugins.debug(`Installing plugin ${id}@${version} from ${fromPath}`);
   const destination = await getManagedPluginPath(id, version);
 

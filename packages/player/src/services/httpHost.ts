@@ -7,6 +7,7 @@ import type {
 } from '@nuclearplayer/plugin-sdk';
 
 import { Logger } from './logger';
+import { isTauriDesktop } from './tauriWebPolyfill';
 
 export const httpHost: HttpHost = {
   fetch: async (
@@ -16,17 +17,71 @@ export const httpHost: HttpHost = {
     const method = init?.method ?? 'GET';
     Logger.http.debug(`${method} ${url}`);
 
-    const response = await invoke<HttpResponseData>('http_fetch', {
-      request: {
-        url,
+    if (isTauriDesktop()) {
+      try {
+        const response = await invoke<HttpResponseData>('http_fetch', {
+          request: {
+            url,
+            method,
+            headers: init?.headers,
+            body: init?.body,
+          },
+        });
+
+        if (response && typeof response.status === 'number') {
+          Logger.http.debug(`${method} ${url} -> ${response.status}`);
+          return response;
+        }
+      } catch (err) {
+        Logger.http.warn(
+          `Tauri http_fetch failed, falling back to web fetch: ${String(err)}`,
+        );
+      }
+    }
+
+    // Web Browser Fetch Fallback using local CORS Proxy Endpoint
+    try {
+      const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxyUrl, {
         method,
-        headers: init?.headers,
+        headers: init?.headers as HeadersInit,
         body: init?.body,
-      },
-    });
+      });
 
-    Logger.http.debug(`${method} ${url} -> ${response.status}`);
+      const bodyText = await res.text();
+      const headersObj: Record<string, string> = {};
+      res.headers.forEach((v, k) => (headersObj[k] = v));
 
-    return response;
+      return {
+        status: res.status,
+        headers: headersObj,
+        body: bodyText,
+      };
+    } catch {
+      // Direct fetch fallback if proxy fails
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: init?.headers as HeadersInit,
+          body: init?.body,
+        });
+
+        const bodyText = await res.text();
+        const headersObj: Record<string, string> = {};
+        res.headers.forEach((v, k) => (headersObj[k] = v));
+
+        return {
+          status: res.status,
+          headers: headersObj,
+          body: bodyText,
+        };
+      } catch (directErr) {
+        return {
+          status: 500,
+          headers: {},
+          body: String(directErr),
+        };
+      }
+    }
   },
 };

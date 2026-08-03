@@ -1,4 +1,4 @@
-import { Heart, ListEnd, ListMusicIcon, ListStart, Play, Sparkles } from 'lucide-react';
+import { Download, Heart, ListEnd, ListMusicIcon, ListStart, Play, Sparkles } from 'lucide-react';
 import { FC, ReactNode, useState } from 'react';
 import { SimilarTracksDialog } from './SimilarTracksDialog';
 
@@ -27,6 +27,17 @@ export const ConnectedTrackContextMenu: FC<ConnectedTrackContextMenuProps> = ({
   const isFavorite = trackActions.isFavorite(track);
   const thumbnail = pickArtwork(track.artwork, 'thumbnail', 64)?.url;
   const artistNames = track.artists.map((a) => a.name).join(', ');
+  const fullTrackQuery = `${artistNames} ${track.title}`.trim();
+
+  const handleDownload = (format: 'mp3' | 'm4a') => {
+    const url = `/api/download-track?q=${encodeURIComponent(fullTrackQuery)}&format=${format}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${fullTrackQuery}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <TrackContextMenu>
@@ -62,6 +73,18 @@ export const ConnectedTrackContextMenu: FC<ConnectedTrackContextMenuProps> = ({
           {isFavorite
             ? t('actions.removeFromFavorites')
             : t('actions.addToFavorites')}
+        </TrackContextMenu.Action>
+        <TrackContextMenu.Action
+          icon={<Download size={16} />}
+          onClick={() => handleDownload('mp3')}
+        >
+          Download MP3
+        </TrackContextMenu.Action>
+        <TrackContextMenu.Action
+          icon={<Download size={16} />}
+          onClick={() => handleDownload('m4a')}
+        >
+          Download M4A / MP4
         </TrackContextMenu.Action>
         <TrackContextMenu.Action
           icon={<Sparkles size={16} />}
