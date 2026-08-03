@@ -75,6 +75,19 @@ export const DownloadProgressDialog: FC<DownloadProgressDialogProps> = ({
       </div>
 
       <Dialog.Actions>
+        {isReady && job.downloadUrl && (
+          <a
+            href={job.downloadUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            download={`${job.title || 'Playlist'}.zip`}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors"
+            onClick={onClose}
+          >
+            <DownloadIcon size={16} />
+            Download ZIP
+          </a>
+        )}
         {(isReady || isError) && (
           <Button variant="secondary" onClick={onClose}>
             Close
