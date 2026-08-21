@@ -9,7 +9,7 @@ export type AudioSource = {
 
 export type SoundStatus = 'playing' | 'paused' | 'stopped';
 export type SoundProps = {
-  src: AudioSource;
+  src?: AudioSource | null;
   status: SoundStatus;
   seek?: number;
   volume?: number;

@@ -13,7 +13,9 @@ const getActiveStreamingProvider = (): StreamingProvider | undefined =>
   providersHost.get<StreamingProvider>(
     providersHost.getActive('streaming'),
     'streaming',
-  );
+  ) ||
+  providersHost.get<StreamingProvider>('built-in-web-streaming', 'streaming') ||
+  (providersHost.list('streaming')[0] as StreamingProvider | undefined);
 
 const isStreamExpired = (candidate: StreamCandidate): boolean => {
   if (!candidate.lastResolvedAtIso || !candidate.stream) {

@@ -34,14 +34,16 @@ export const CrossfadeSound: React.FC<
 }) => {
   const audioRefA = useRef<HTMLAudioElement | null>(null);
   const audioRefB = useRef<HTMLAudioElement | null>(null);
+  const [audioElementA, setAudioElementA] = useState<HTMLAudioElement | null>(null);
+  const [audioElementB, setAudioElementB] = useState<HTMLAudioElement | null>(null);
   const [activeIndex, setActiveIndex] = useState<number>(0);
 
   const context = useAudioContext();
-  const { source: sourceA } = useAudioElementSource(audioRefA, context);
-  const { source: sourceB } = useAudioElementSource(audioRefB, context);
-  const isReady = !!sourceA && !!sourceB;
+  const { source: sourceA } = useAudioElementSource(audioElementA, context);
+  const { source: sourceB } = useAudioElementSource(audioElementB, context);
+  const isReady = (!!sourceA && !!sourceB) || !context;
 
-  const prevSrc = useRef<AudioSource>(src);
+  const prevSrc = useRef<AudioSource | null | undefined>(src);
 
   const adapters = useMemo(
     () =>
@@ -49,11 +51,19 @@ export const CrossfadeSound: React.FC<
         {
           id: 0,
           ref: audioRefA,
+          setRef: (el: HTMLAudioElement | null) => {
+            audioRefA.current = el;
+            setAudioElementA(el);
+          },
           source: sourceA,
         },
         {
           id: 1,
           ref: audioRefB,
+          setRef: (el: HTMLAudioElement | null) => {
+            audioRefB.current = el;
+            setAudioElementB(el);
+          },
           source: sourceB,
         },
       ] as const,
@@ -170,7 +180,7 @@ export const CrossfadeSound: React.FC<
       {[adapters[0], adapters[1]].map((adapter) => (
         <audio
           key={adapter.id}
-          ref={adapter.ref}
+          ref={adapter.setRef}
           hidden
           preload={preload}
           crossOrigin={crossOrigin}
@@ -181,7 +191,7 @@ export const CrossfadeSound: React.FC<
           onError={handleError}
         >
           <source
-            src={activeIndex === adapter.id ? prevSrc.current.url : src.url}
+            src={activeIndex === adapter.id ? prevSrc.current?.url : src?.url}
           />
         </audio>
       ))}

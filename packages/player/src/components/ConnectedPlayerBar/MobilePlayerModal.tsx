@@ -1,7 +1,8 @@
+import { Link } from '@tanstack/react-router';
 import {
+  Activity,
   ChevronDown,
   Heart,
-  MoreVertical,
   Pause,
   Play,
   Repeat,
@@ -67,9 +68,11 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
             {artistName}
           </div>
         </div>
-        <Button size="icon" variant="text">
-          <MoreVertical size={22} />
-        </Button>
+        <Link to="/visualizer" onClick={onClose}>
+          <Button size="icon" variant="text" className="text-primary hover:text-foreground" aria-label="Visualizer">
+            <Activity size={22} />
+          </Button>
+        </Link>
       </div>
 
       {/* Album Artwork */}

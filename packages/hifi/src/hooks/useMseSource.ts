@@ -28,7 +28,7 @@ const jumpBufferedGap = (audio: HTMLAudioElement): boolean => {
 
 export const useMseSource = (
   audioRef: RefObject<HTMLAudioElement | null>,
-  src: AudioSource,
+  src: AudioSource | null | undefined,
   isReady: boolean,
   onError?: (error: Error) => void,
 ) => {
@@ -41,7 +41,7 @@ export const useMseSource = (
     }
 
     const audio = audioRef.current;
-    if (!audio || !isReady || src.protocol !== 'mse') {
+    if (!audio || !isReady || !src || src.protocol !== 'mse') {
       return;
     }
 
@@ -94,5 +94,5 @@ export const useMseSource = (
       controller.destroy(audio);
       controllerRef.current = null;
     };
-  }, [src.url, src.protocol, src.durationSeconds, isReady, audioRef, onError]);
+  }, [src?.url, src?.protocol, src?.durationSeconds, isReady, audioRef, onError]);
 };

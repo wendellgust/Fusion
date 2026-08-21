@@ -1,5 +1,6 @@
 import { createRootRoute } from '@tanstack/react-router';
 import {
+  Activity,
   BarChart3,
   CableIcon,
   DiscIcon,
@@ -74,8 +75,8 @@ const RootComponent = () => {
             onWidthChange={setLeftSidebarWidth}
             onToggle={toggleLeftSidebar}
           >
-            <SidebarNavigation isCompact={leftSidebar.isCollapsed} className="pb-28">
-              <div className="flex flex-1 flex-col gap-2 overflow-y-auto pb-6">
+            <SidebarNavigation isCompact={leftSidebar.isCollapsed} className="h-full overflow-hidden">
+              <div className="flex flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1 pb-16 [scrollbar-width:thin]">
                 <SidebarNavigationItem
                   to="/dashboard"
                   icon={<GaugeIcon />}
@@ -121,13 +122,20 @@ const RootComponent = () => {
                   icon={<MicVocalIcon />}
                   label="Lyrics"
                 />
+                <SidebarNavigationItem
+                  to="/visualizer"
+                  icon={<Activity />}
+                  label="Visualizer"
+                />
+                <div className="pt-2">
+                  <PomodoroTimer isCompact={leftSidebar.isCollapsed} />
+                </div>
+                <SidebarNavigationItem
+                  icon={<SettingsIcon />}
+                  label={tPrefs('title')}
+                  onClick={() => openSettings()}
+                />
               </div>
-              <PomodoroTimer isCompact={leftSidebar.isCollapsed} />
-              <SidebarNavigationItem
-                icon={<SettingsIcon />}
-                label={tPrefs('title')}
-                onClick={() => openSettings()}
-              />
             </SidebarNavigation>
           </PlayerWorkspace.LeftSidebar>
 

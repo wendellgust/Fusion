@@ -134,10 +134,10 @@ export const ConnectedPlayerBarWrapper = {
 
   nowPlaying: {
     title(text: string) {
-      return screen.getByText(text);
+      return screen.getByTestId('now-playing-title') || screen.getAllByText(text)[0];
     },
     artist(text: string) {
-      return screen.queryByText(text);
+      return screen.queryByTestId('player-now-playing-artist') || screen.queryAllByText(text)[0];
     },
     get thumbnail() {
       return screen.queryByTestId('player-now-playing-thumbnail');

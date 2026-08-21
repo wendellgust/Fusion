@@ -351,4 +351,47 @@ describe('useQueueStore', () => {
       expect(useQueueStore.getState().currentIndex).toBe(0);
     });
   });
+
+  describe('moveFailedCurrentItemToCacheEnd', () => {
+    it('moves failed current track to after the 5th cached track, advancing 6th to 5th', () => {
+      const tracks = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((t) =>
+        createMockTrack(t),
+      );
+      useQueueStore.getState().addToQueue(tracks);
+      useQueueStore.setState({ currentIndex: 0 });
+
+      useQueueStore.getState().moveFailedCurrentItemToCacheEnd(5);
+
+      const titles = useQueueStore
+        .getState()
+        .items.map((item) => item.track.title);
+      expect(titles).toEqual(['B', 'C', 'D', 'E', 'F', 'A', 'G']);
+      expect(useQueueStore.getState().currentIndex).toBe(0);
+      expect(useQueueStore.getState().items[5].status).toBe('idle');
+    });
+
+    it('moves failed current track to end of queue when fewer than 6 items remaining', () => {
+      const tracks = ['A', 'B', 'C', 'D', 'E'].map((t) => createMockTrack(t));
+      useQueueStore.getState().addToQueue(tracks);
+      useQueueStore.setState({ currentIndex: 0 });
+
+      useQueueStore.getState().moveFailedCurrentItemToCacheEnd(5);
+
+      const titles = useQueueStore
+        .getState()
+        .items.map((item) => item.track.title);
+      expect(titles).toEqual(['B', 'C', 'D', 'E', 'A']);
+      expect(useQueueStore.getState().currentIndex).toBe(0);
+    });
+
+    it('does nothing when queue has 1 or fewer items', () => {
+      useQueueStore.getState().addToQueue([createMockTrack('Single')]);
+      useQueueStore.setState({ currentIndex: 0 });
+
+      useQueueStore.getState().moveFailedCurrentItemToCacheEnd(5);
+
+      expect(useQueueStore.getState().items).toHaveLength(1);
+      expect(useQueueStore.getState().items[0].track.title).toBe('Single');
+    });
+  });
 });

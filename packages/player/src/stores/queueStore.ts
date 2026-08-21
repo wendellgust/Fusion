@@ -32,6 +32,7 @@ type QueueStore = Queue & {
   goToIndex: (index: number) => void;
   goToId: (id: string) => void;
   getCurrentItem: () => QueueItem | undefined;
+  moveFailedCurrentItemToCacheEnd: (cacheWindowSize?: number) => void;
 };
 
 const createQueueItem = (track: Track): QueueItem => ({
@@ -323,6 +324,42 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     const { items, currentIndex } = get();
     return items[currentIndex];
   },
+
+  moveFailedCurrentItemToCacheEnd: withPersistence(
+    (cacheWindowSize = 5) => {
+      const { items } = get();
+      if (items.length <= 1) {
+        return;
+      }
+
+      set(
+        produce((state: QueueStore) => {
+          if (
+            state.currentIndex < 0 ||
+            state.currentIndex >= state.items.length
+          ) {
+            return;
+          }
+
+          const [failedItem] = state.items.splice(state.currentIndex, 1);
+          failedItem.status = 'idle';
+          failedItem.error = undefined;
+
+          // Insert after the remaining cached window (index currentIndex + cacheWindowSize)
+          // Advancing the 6th item (index currentIndex + 5 original) to the 5th spot
+          const targetIndex = Math.min(
+            state.currentIndex + cacheWindowSize,
+            state.items.length,
+          );
+          state.items.splice(targetIndex, 0, failedItem);
+
+          if (state.currentIndex >= state.items.length) {
+            state.currentIndex = Math.max(0, state.items.length - 1);
+          }
+        }),
+      );
+    },
+  ),
 }));
 
 export const initializeQueueStore = async (): Promise<void> => {

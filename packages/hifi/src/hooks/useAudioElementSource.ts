@@ -1,8 +1,8 @@
-import { RefObject, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { audioLog } from '../logger';
 
 export const useAudioElementSource = (
-  audioRef: RefObject<HTMLAudioElement | null>,
+  audioElement: HTMLAudioElement | null,
   context: AudioContext | null,
 ) => {
   const [source, setSource] = useState<MediaElementAudioSourceNode | null>(
@@ -10,20 +10,35 @@ export const useAudioElementSource = (
   );
 
   useEffect(() => {
-    if (!context || !audioRef.current) {
+    if (!context || !audioElement) {
+      setSource(null);
       return;
     }
 
     audioLog('debug', `Creating MediaElementAudioSourceNode for HTMLAudioElement`);
-    const audioSource = context.createMediaElementSource(audioRef.current);
-    audioLog('debug', `MediaElementAudioSourceNode created successfully`);
-    setSource(audioSource);
+    let audioSource: MediaElementAudioSourceNode | null = null;
+    try {
+      audioSource = context.createMediaElementSource(audioElement);
+      audioLog('debug', `MediaElementAudioSourceNode created successfully`);
+      setSource(audioSource);
+    } catch (err) {
+      audioLog(
+        'error',
+        `Failed to create MediaElementAudioSourceNode: ${(err as Error).message}`,
+      );
+      return;
+    }
 
     return () => {
       audioLog('debug', `Disconnecting MediaElementAudioSourceNode`);
-      audioSource.disconnect();
+      try {
+        audioSource?.disconnect();
+      } catch {
+        /* ignore */
+      }
+      setSource(null);
     };
-  }, [context, audioRef]);
+  }, [context, audioElement]);
 
   return { source };
 };

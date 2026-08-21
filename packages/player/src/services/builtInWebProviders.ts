@@ -270,20 +270,25 @@ export const webStreamingProvider = {
     }
 
     // 3. System server yt-dlp API resolution (/api/yt-stream) returning direct stream URL
-    try {
-      const ytRes = await fetch(`/api/yt-stream?q=${encodeURIComponent(candidateId)}`);
-      if (ytRes.ok) {
-        const json = await ytRes.json();
-        if (json.success && json.url) {
-          return {
-            url: json.url,
-            protocol: 'http',
-            source: { provider: 'built-in-web-streaming', id: candidateId },
-          };
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const ytRes = await fetch(`/api/yt-stream?q=${encodeURIComponent(candidateId)}`);
+        if (ytRes.ok) {
+          const json = await ytRes.json();
+          if (json.success && json.url) {
+            return {
+              url: json.url,
+              protocol: 'http',
+              source: { provider: 'built-in-web-streaming', id: candidateId },
+            };
+          }
+        }
+      } catch (err) {
+        console.warn(`Server yt-stream API resolution attempt ${attempt} error:`, err);
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 600));
         }
       }
-    } catch (err) {
-      console.warn('Server yt-stream API resolution error:', err);
     }
 
     // 4. Fallback to Piped API
@@ -331,12 +336,7 @@ export const webStreamingProvider = {
       }
     }
 
-    // Ultimate fallback if all external YouTube resolvers fail: Groove Salad radio stream
-    return {
-      url: 'https://ice2.somafm.com/groovesalad-128-mp3',
-      protocol: 'http',
-      source: { provider: 'built-in-web-streaming', id: candidateId },
-    };
+    throw new Error(`Could not resolve stream for track: ${candidateId}`);
   },
 
   async getStreamUrlV2(candidate: any): Promise<Stream> {

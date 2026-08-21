@@ -5,7 +5,10 @@ import { Sound, Volume } from '@nuclearplayer/hifi';
 import { useTranslation } from '@nuclearplayer/i18n';
 
 import { useCoreSetting } from '../hooks/useCoreSetting';
-import { reResolveCurrentTrack } from '../hooks/useStreamResolution';
+import {
+  handleCurrentTrackFailure,
+  reResolveCurrentTrack,
+} from '../hooks/useStreamResolution';
 import { eventBus } from '../services/eventBus';
 import { Logger } from '../services/logger';
 import { useQueueStore } from '../stores/queueStore';
@@ -22,14 +25,10 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     null,
   );
   const pendingSeekRef = useRef<number | null>(null);
+  const lastFailureTimeRef = useRef<number>(0);
   const setAnalyser = useVisualizerStore((state) => state.setAnalyser);
   const preload: HTMLAudioElement['preload'] = 'auto';
-  const isNativeNetworkStream =
-    (src?.protocol === 'http' || src?.protocol === 'https') &&
-    (src?.url?.startsWith('http://') || src?.url?.startsWith('https://'));
-  const crossOrigin = isNativeNetworkStream
-    ? ('anonymous' as const)
-    : ('' as const);
+  const crossOrigin = 'anonymous' as const;
   const [volume01] = useCoreSetting<number>('playback.volume');
   const [muted] = useCoreSetting<boolean>('playback.muted');
   const volumePercent = muted ? 0 : Math.round((volume01 ?? 1) * 100);
@@ -45,6 +44,15 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   useEffect(() => {
     if (typeof window === 'undefined' || !('mediaSession' in navigator)) {
       return;
+    }
+
+    if ('playbackState' in navigator.mediaSession) {
+      navigator.mediaSession.playbackState =
+        status === 'playing'
+          ? 'playing'
+          : status === 'paused'
+            ? 'paused'
+            : 'none';
     }
 
     const currentItem = useQueueStore.getState().getCurrentItem();
@@ -95,6 +103,20 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
           useSoundStore.getState().seekTo(details.seekTime);
         }
       });
+      navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+        const skipTime = details.seekOffset || 10;
+        const current = useSoundStore.getState().seek || 0;
+        useSoundStore.getState().seekTo(Math.max(0, current - skipTime));
+      });
+      navigator.mediaSession.setActionHandler('seekforward', (details) => {
+        const skipTime = details.seekOffset || 10;
+        const current = useSoundStore.getState().seek || 0;
+        const duration = useSoundStore.getState().duration || current + 10;
+        useSoundStore.getState().seekTo(Math.min(duration, current + skipTime));
+      });
+      navigator.mediaSession.setActionHandler('stop', () => {
+        useSoundStore.getState().stop();
+      });
     } catch {
       /* ignore unsupported actions */
     }
@@ -103,6 +125,24 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   const handleTimeUpdate = useCallback(
     ({ position, duration }: { position: number; duration: number }) => {
       useSoundStore.getState().updatePlayback(position, duration);
+      if (
+        typeof navigator !== 'undefined' &&
+        'mediaSession' in navigator &&
+        navigator.mediaSession.setPositionState &&
+        duration > 0 &&
+        position >= 0 &&
+        position <= duration
+      ) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration,
+            playbackRate: 1,
+            position,
+          });
+        } catch {
+          /* ignore invalid state */
+        }
+      }
     },
     [],
   );
@@ -149,8 +189,19 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         void reResolveCurrentTrack(t);
         return;
       }
+
       const message = resolveErrorMessage(error);
       Logger.streaming.error(`Playback error: ${message}`);
+
+      if (!src || status === 'stopped') {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastFailureTimeRef.current < 1500) {
+        return;
+      }
+      lastFailureTimeRef.current = now;
 
       const currentItem = useQueueStore.getState().getCurrentItem();
       if (currentItem) {
@@ -158,8 +209,10 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
           .getState()
           .updateItemState(currentItem.id, { status: 'error', error: message });
       }
+
+      handleCurrentTrackFailure(t);
     },
-    [audioElement, t],
+    [audioElement, src, status, t],
   );
 
   const handleAudioElement = useCallback((el: HTMLAudioElement | null) => {
@@ -239,25 +292,23 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
   return (
     <>
-      {src && (
-        <Sound
-          src={src}
-          status={status}
-          seek={seek}
-          volume={volumePercent}
-          preload={preload}
-          crossOrigin={crossOrigin}
-          onTimeUpdate={handleTimeUpdate}
-          onEnd={handleEnd}
-          onCanPlay={handleCanPlay}
-          onError={handleError}
-          bypassWebAudio={bypassWebAudio}
-          onAudioElement={handleAudioElement}
-        >
-          <Volume value={volumePercent} />
-          <VisualizerAnalyser />
-        </Sound>
-      )}
+      <Sound
+        src={src}
+        status={status}
+        seek={seek}
+        volume={volumePercent}
+        preload={preload}
+        crossOrigin={crossOrigin}
+        onTimeUpdate={handleTimeUpdate}
+        onEnd={handleEnd}
+        onCanPlay={handleCanPlay}
+        onError={handleError}
+        bypassWebAudio={bypassWebAudio}
+        onAudioElement={handleAudioElement}
+      >
+        <Volume value={volumePercent} />
+        <VisualizerAnalyser />
+      </Sound>
       {children}
     </>
   );

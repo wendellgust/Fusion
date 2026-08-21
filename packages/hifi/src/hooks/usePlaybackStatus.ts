@@ -11,7 +11,7 @@ const isReadyToPlay = (audio: HTMLAudioElement): boolean =>
 export const usePlaybackStatus = (
   audioRef: RefObject<HTMLAudioElement | null>,
   status: SoundStatus,
-  srcUrl: string,
+  srcUrl: string | undefined | null,
   context: AudioContext | null,
   isReady: boolean,
   onError?: (error: Error) => void,
@@ -19,7 +19,7 @@ export const usePlaybackStatus = (
   const activeSrcRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isReady) {
+    if (!isReady || !srcUrl) {
       return;
     }
     const audio = audioRef.current;
@@ -77,7 +77,7 @@ export const usePlaybackStatus = (
             'error',
             `audio.play() failed: ${err.name} - ${err.message}`,
           );
-          if (err.name === 'AbortError') {
+          if (err.name === 'AbortError' || err.name === 'NotAllowedError') {
             return;
           }
           onError?.(err);
