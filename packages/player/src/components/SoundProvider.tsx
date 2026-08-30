@@ -125,26 +125,48 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       }
     };
 
-    registerHandler('play', () => {
+    const handlePlay = () => {
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
         if (audio.networkState === 3 || audio.error) {
           audio.load();
         }
         audio.play().catch(() => {});
+        if (navigator.mediaSession.setPositionState && audio.duration > 0) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: audio.duration,
+              position: audio.currentTime,
+              playbackRate: 1,
+            });
+          } catch {
+            // Ignore error
+          }
+        }
       }
       useSoundStore.getState().play();
-    });
+    };
 
-    registerHandler('pause', () => {
+    const handlePause = () => {
       const audio = document.querySelector('audio');
       if (audio && !audio.paused) {
         audio.pause();
+        if (navigator.mediaSession.setPositionState && audio.duration > 0) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: audio.duration,
+              position: audio.currentTime,
+              playbackRate: 0,
+            });
+          } catch {
+            // Ignore error
+          }
+        }
       }
       useSoundStore.getState().pause();
-    });
+    };
 
-    registerHandler('previoustrack', () => {
+    const handlePrevious = () => {
       const audio = document.querySelector('audio');
       if (audio) {
         const queue = useQueueStore.getState();
@@ -163,9 +185,9 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         audio.play().catch(() => {});
       }
       useQueueStore.getState().goToPrevious();
-    });
+    };
 
-    registerHandler('nexttrack', () => {
+    const handleNext = () => {
       const audio = document.querySelector('audio');
       if (audio) {
         const queue = useQueueStore.getState();
@@ -184,7 +206,16 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         audio.play().catch(() => {});
       }
       useQueueStore.getState().goToNext();
-    });
+    };
+
+    registerHandler('play', handlePlay);
+    registerHandler('pause', handlePause);
+    registerHandler('previoustrack', handlePrevious);
+    registerHandler('nexttrack', handleNext);
+
+    // Fallback: If iOS insists on showing skip 10s/15s buttons, make them skip the entire track as requested.
+    registerHandler('seekbackward', handlePrevious);
+    registerHandler('seekforward', handleNext);
 
     registerHandler('seekto', (details: MediaSessionActionDetails) => {
       if (details.seekTime !== undefined) {
@@ -195,10 +226,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         useSoundStore.getState().seekTo(details.seekTime);
       }
     });
-
-    // Explicitly disable seekbackward/seekforward handlers so iOS renders Previous/Next track buttons
-    registerHandler('seekbackward', null);
-    registerHandler('seekforward', null);
 
     registerHandler('stop', () => {
       const audio = document.querySelector('audio');
