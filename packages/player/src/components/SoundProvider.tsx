@@ -14,6 +14,7 @@ import { Logger } from '../services/logger';
 import { useQueueStore } from '../stores/queueStore';
 import { useSoundStore } from '../stores/soundStore';
 import { useVisualizerStore } from '../stores/visualizerStore';
+import { getTrackArtworkUrl } from '../utils/artworkHelper';
 import { resolveErrorMessage } from '../utils/logging';
 import { VisualizerAnalyser } from './VisualizerAnalyser';
 
@@ -59,25 +60,41 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     const track = currentItem?.track;
 
     if (track) {
+      const trackRecord = track as unknown as {
+        name?: string;
+        title?: string;
+        artist?: string;
+        artists?: Array<{ name: string }>;
+        album?: { title?: string } | string;
+      };
       const artistName =
-        (track as any).artist ||
-        (track as any).artists?.[0]?.name ||
+        trackRecord.artist ||
+        trackRecord.artists?.[0]?.name ||
         'Unknown Artist';
       const trackTitle =
-        (track as any).name || (track as any).title || 'Unknown Track';
-      const artworkUrl =
-        (track as any).thumbnail ||
-        (track as any).album?.artwork?.items?.[0]?.url ||
-        (track as any).album?.coverImage ||
-        '';
+        trackRecord.name || trackRecord.title || 'Unknown Track';
+      const albumTitle =
+        typeof trackRecord.album === 'object' && trackRecord.album !== null
+          ? trackRecord.album.title || ''
+          : typeof trackRecord.album === 'string'
+            ? trackRecord.album
+            : '';
+      const artworkUrl = getTrackArtworkUrl(track);
 
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: trackTitle,
           artist: artistName,
-          album: (track as any).album?.title || (track as any).album || '',
+          album: albumTitle,
           artwork: artworkUrl
-            ? [{ src: artworkUrl, sizes: '512x512', type: 'image/jpeg' }]
+            ? [
+                { src: artworkUrl, sizes: '96x96', type: 'image/jpeg' },
+                { src: artworkUrl, sizes: '128x128', type: 'image/jpeg' },
+                { src: artworkUrl, sizes: '192x192', type: 'image/jpeg' },
+                { src: artworkUrl, sizes: '256x256', type: 'image/jpeg' },
+                { src: artworkUrl, sizes: '384x384', type: 'image/jpeg' },
+                { src: artworkUrl, sizes: '512x512', type: 'image/jpeg' },
+              ]
             : [],
         });
       } catch {
@@ -103,17 +120,9 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
           useSoundStore.getState().seekTo(details.seekTime);
         }
       });
-      navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-        const skipTime = details.seekOffset || 10;
-        const current = useSoundStore.getState().seek || 0;
-        useSoundStore.getState().seekTo(Math.max(0, current - skipTime));
-      });
-      navigator.mediaSession.setActionHandler('seekforward', (details) => {
-        const skipTime = details.seekOffset || 10;
-        const current = useSoundStore.getState().seek || 0;
-        const duration = useSoundStore.getState().duration || current + 10;
-        useSoundStore.getState().seekTo(Math.min(duration, current + skipTime));
-      });
+      // Explicitly disable seekbackward/seekforward handlers so iOS renders Previous/Next track buttons
+      navigator.mediaSession.setActionHandler('seekbackward', null);
+      navigator.mediaSession.setActionHandler('seekforward', null);
       navigator.mediaSession.setActionHandler('stop', () => {
         useSoundStore.getState().stop();
       });

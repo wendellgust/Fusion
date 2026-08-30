@@ -14,8 +14,10 @@ import type { FC } from 'react';
 
 import { Button, Slider } from '@nuclearplayer/ui';
 
+import { useFavoritesStore } from '../../stores/favoritesStore';
 import { useQueueStore } from '../../stores/queueStore';
 import { useSoundStore } from '../../stores/soundStore';
+import { getTrackArtworkUrl } from '../../utils/artworkHelper';
 
 type MobilePlayerModalProps = {
   isOpen: boolean;
@@ -26,10 +28,6 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  if (!isOpen) {
-    return null;
-  }
-
   const currentItem = useQueueStore((state) => state.getCurrentItem());
   const goToNext = useQueueStore((state) => state.goToNext);
   const goToPrevious = useQueueStore((state) => state.goToPrevious);
@@ -37,17 +35,39 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
   const { status, toggle, seek, duration, seekTo } = useSoundStore();
   const isPlaying = status === 'playing';
 
+  const isTrackFavorite = useFavoritesStore((s) => s.isTrackFavorite);
+  const addTrack = useFavoritesStore((s) => s.addTrack);
+  const removeTrack = useFavoritesStore((s) => s.removeTrack);
+
+  const isFavorite = track
+    ? isTrackFavorite(track.source) ||
+      isTrackFavorite(track as unknown as Parameters<typeof isTrackFavorite>[0])
+    : false;
+
+  const handleToggleFavorite = () => {
+    if (!track) {
+      return;
+    }
+    if (isFavorite) {
+      if (track.source) {
+        removeTrack(track.source);
+      }
+      removeTrack(track as unknown as Parameters<typeof removeTrack>[0]);
+    } else {
+      addTrack(track);
+    }
+  };
+
+  if (!isOpen) {
+    return null;
+  }
+
   const trackRecord = track as unknown as
     | {
         name?: string;
         title?: string;
         artist?: string;
         artists?: Array<{ name: string }>;
-        thumbnail?: string;
-        album?: {
-          artwork?: { items?: Array<{ url: string }> };
-          coverImage?: string;
-        };
       }
     | undefined;
 
@@ -55,11 +75,7 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
     trackRecord?.title || trackRecord?.name || 'No Track Selected';
   const artistName =
     trackRecord?.artist || trackRecord?.artists?.[0]?.name || 'Unknown Artist';
-  const coverUrl =
-    trackRecord?.thumbnail ||
-    trackRecord?.album?.artwork?.items?.[0]?.url ||
-    trackRecord?.album?.coverImage ||
-    '';
+  const coverUrl = getTrackArtworkUrl(track);
 
   const formatTime = (seconds: number) => {
     if (!seconds || isNaN(seconds)) {
@@ -124,8 +140,14 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
             {artistName}
           </p>
         </div>
-        <Button size="icon" variant="text" className="text-primary">
-          <Heart size={24} />
+        <Button
+          size="icon"
+          variant="text"
+          onClick={handleToggleFavorite}
+          className={isFavorite ? 'text-red-500' : 'text-foreground-secondary'}
+          aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        >
+          <Heart size={26} fill={isFavorite ? 'currentColor' : 'none'} />
         </Button>
       </div>
 

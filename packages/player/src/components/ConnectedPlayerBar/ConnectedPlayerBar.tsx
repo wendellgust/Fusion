@@ -5,6 +5,7 @@ import { Button, PlayerBar } from '@nuclearplayer/ui';
 
 import { useQueueStore } from '../../stores/queueStore';
 import { useSoundStore } from '../../stores/soundStore';
+import { getTrackArtworkUrl } from '../../utils/artworkHelper';
 import { ConnectedControls } from './ConnectedControls';
 import { ConnectedNowPlaying } from './ConnectedNowPlaying';
 import { ConnectedSeekBar } from './ConnectedSeekBar';
@@ -26,11 +27,6 @@ export const ConnectedPlayerBar: FC = () => {
         title?: string;
         artist?: string;
         artists?: Array<{ name: string }>;
-        thumbnail?: string;
-        album?: {
-          artwork?: { items?: Array<{ url: string }> };
-          coverImage?: string;
-        };
       }
     | undefined;
 
@@ -38,11 +34,7 @@ export const ConnectedPlayerBar: FC = () => {
     trackRecord?.title || trackRecord?.name || 'No Track Selected';
   const artistName =
     trackRecord?.artist || trackRecord?.artists?.[0]?.name || 'Unknown Artist';
-  const coverUrl =
-    trackRecord?.thumbnail ||
-    trackRecord?.album?.artwork?.items?.[0]?.url ||
-    trackRecord?.album?.coverImage ||
-    '';
+  const coverUrl = getTrackArtworkUrl(track);
 
   return (
     <>

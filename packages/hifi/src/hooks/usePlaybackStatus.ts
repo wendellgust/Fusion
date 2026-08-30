@@ -3,11 +3,6 @@ import { RefObject, useEffect, useRef } from 'react';
 import { audioLog } from '../logger';
 import { SoundStatus } from '../types';
 
-const HAVE_METADATA = 1;
-
-const isReadyToPlay = (audio: HTMLAudioElement): boolean =>
-  audio.readyState >= HAVE_METADATA;
-
 export const usePlaybackStatus = (
   audioRef: RefObject<HTMLAudioElement | null>,
   status: SoundStatus,
@@ -38,16 +33,12 @@ export const usePlaybackStatus = (
         'debug',
         `tryPlay: readyState=${audio.readyState}, paused=${audio.paused}`,
       );
-      if (!isReadyToPlay(audio)) {
-        audioLog('debug', `tryPlay: ignored, readyState < HAVE_METADATA`);
-        return;
-      }
-      if (!audio.paused) {
+      if (!audio.paused && activeSrcRef.current === srcUrl) {
         audioLog('debug', `tryPlay: ignored, already playing`);
         return;
       }
       activeSrcRef.current = srcUrl;
-      if (context) {
+      if (context && context.state === 'suspended') {
         audioLog(
           'debug',
           `Resuming AudioContext. Current state: ${context.state}`,
@@ -57,45 +48,47 @@ export const usePlaybackStatus = (
           resumePromise.then(() => {
             audioLog('debug', `AudioContext resumed. State: ${context.state}`);
           });
-        } else {
-          audioLog(
-            'debug',
-            `AudioContext resumed (sync/mock). State: ${context.state}`,
-          );
         }
       }
       audioLog('debug', `Calling audio.play()`);
-      audio.play().then(
-        () => {
-          audioLog(
-            'debug',
-            `audio.play() succeeded. Current time: ${audio.currentTime}`,
-          );
-        },
-        (err: DOMException) => {
-          audioLog(
-            'error',
-            `audio.play() failed: ${err.name} - ${err.message}`,
-          );
-          if (err.name === 'AbortError' || err.name === 'NotAllowedError') {
-            return;
-          }
-          onError?.(err);
-        },
-      );
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.then(
+          () => {
+            audioLog(
+              'debug',
+              `audio.play() succeeded. Current time: ${audio.currentTime}`,
+            );
+          },
+          (err: DOMException) => {
+            audioLog(
+              'warn',
+              `audio.play() caught: ${err.name} - ${err.message}`,
+            );
+            if (err.name === 'AbortError' || err.name === 'NotAllowedError') {
+              return;
+            }
+            onError?.(err);
+          },
+        );
+      }
     };
 
     switch (status) {
       case 'playing': {
-        if (!srcChanged || isReadyToPlay(audio)) {
-          tryPlay();
-        }
+        tryPlay();
         const onCanPlay = () => {
-          audioLog('debug', `HTMLAudioElement fired canplay event`);
-          tryPlay();
+          audioLog('debug', `HTMLAudioElement fired canplay/loadeddata event`);
+          if (audio.paused) {
+            tryPlay();
+          }
         };
         audio.addEventListener('canplay', onCanPlay);
-        return () => audio.removeEventListener('canplay', onCanPlay);
+        audio.addEventListener('loadeddata', onCanPlay);
+        return () => {
+          audio.removeEventListener('canplay', onCanPlay);
+          audio.removeEventListener('loadeddata', onCanPlay);
+        };
       }
       case 'paused': {
         audioLog('debug', `Pausing HTMLAudioElement`);
