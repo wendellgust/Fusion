@@ -227,9 +227,10 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('previoustrack', handlePrevious);
     registerHandler('nexttrack', handleNext);
 
-    // Map skip-10s/15s buttons to full track skip (iOS forces these on streaming audio)
-    registerHandler('seekbackward', handlePrevious);
-    registerHandler('seekforward', handleNext);
+    // Setting these to null tells iOS "I don't support skip-10s" which forces it
+    // to show the previous/next track buttons instead.
+    registerHandler('seekbackward', null);
+    registerHandler('seekforward', null);
 
     registerHandler('seekto', (details: MediaSessionActionDetails) => {
       if (details.seekTime !== undefined) {
