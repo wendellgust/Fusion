@@ -22,7 +22,7 @@ import { SoundProps } from './types';
 
 const PROTOCOLS_WITHOUT_WEB_AUDIO = new Set(['mse', 'hls']);
 
-const isIOSDevice = (): boolean => {
+export const isIOSDevice = (): boolean => {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
     return false;
   }
@@ -140,7 +140,9 @@ export const Sound: React.FC<SoundProps> = ({
   }, [onCanPlay]);
 
   const handleLoadStart = useCallback(() => {
-    if (!src?.url) return;
+    if (!src?.url) {
+      return;
+    }
     audioLog(
       'debug',
       `handleLoadStart callback triggered: starting load for url="${src.url}"`,
@@ -164,30 +166,39 @@ export const Sound: React.FC<SoundProps> = ({
         hidden
         playsInline
         preload={preload}
-        crossOrigin={crossOrigin}
+        crossOrigin={
+          effectiveBypassWebAudio ? undefined : crossOrigin || undefined
+        }
         onTimeUpdate={handleTimeUpdate}
         onEnded={onEnd}
         onLoadStart={handleLoadStart}
         onCanPlay={handleCanPlay}
+        onPlaying={handleCanPlay}
         onError={handleError}
       />
-      {isReady && !effectiveBypassWebAudio && context && childArray.length > 0 && (
-        <>
-          {childArray.map((child, idx) =>
-            cloneElement(child as React.ReactElement<Record<string, unknown>>, {
-              key: idx,
-              audioContext: context,
-              previousNode: audioNodes[idx],
-              onRegister: handleRegisterPlugin,
-            }),
-          )}
-          <Destination
-            key="destination"
-            audioContext={context}
-            previousNode={audioNodes[childArray.length]}
-          />
-        </>
-      )}
+      {isReady &&
+        !effectiveBypassWebAudio &&
+        context &&
+        childArray.length > 0 && (
+          <>
+            {childArray.map((child, idx) =>
+              cloneElement(
+                child as React.ReactElement<Record<string, unknown>>,
+                {
+                  key: idx,
+                  audioContext: context,
+                  previousNode: audioNodes[idx],
+                  onRegister: handleRegisterPlugin,
+                },
+              ),
+            )}
+            <Destination
+              key="destination"
+              audioContext={context}
+              previousNode={audioNodes[childArray.length]}
+            />
+          </>
+        )}
     </>
   );
 };

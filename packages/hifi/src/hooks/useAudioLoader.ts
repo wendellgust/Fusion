@@ -25,7 +25,6 @@ export const useAudioLoader = (
 
     if (src.url !== prevUrl.current) {
       audio.src = src.url;
-      audio.load();
       prevUrl.current = src.url;
     }
   }, [src, isReady, audioRef]);

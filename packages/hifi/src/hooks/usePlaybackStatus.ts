@@ -65,7 +65,48 @@ export const usePlaybackStatus = (
               'warn',
               `audio.play() caught: ${err.name} - ${err.message}`,
             );
-            if (err.name === 'AbortError' || err.name === 'NotAllowedError') {
+            if (err.name === 'AbortError') {
+              return;
+            }
+            if (err.name === 'NotAllowedError') {
+              // iOS Safari User-Activation policy: retry playback on the next user interaction
+              const resumeOnUserGesture = () => {
+                window.removeEventListener(
+                  'touchstart',
+                  resumeOnUserGesture,
+                  true,
+                );
+                window.removeEventListener(
+                  'touchend',
+                  resumeOnUserGesture,
+                  true,
+                );
+                window.removeEventListener(
+                  'pointerdown',
+                  resumeOnUserGesture,
+                  true,
+                );
+                window.removeEventListener('click', resumeOnUserGesture, true);
+                if (audio.paused && activeSrcRef.current === srcUrl) {
+                  audio.play().catch(() => {});
+                }
+              };
+              window.addEventListener('touchstart', resumeOnUserGesture, {
+                capture: true,
+                once: true,
+              });
+              window.addEventListener('touchend', resumeOnUserGesture, {
+                capture: true,
+                once: true,
+              });
+              window.addEventListener('pointerdown', resumeOnUserGesture, {
+                capture: true,
+                once: true,
+              });
+              window.addEventListener('click', resumeOnUserGesture, {
+                capture: true,
+                once: true,
+              });
               return;
             }
             onError?.(err);
@@ -78,16 +119,23 @@ export const usePlaybackStatus = (
       case 'playing': {
         tryPlay();
         const onCanPlay = () => {
-          audioLog('debug', `HTMLAudioElement fired canplay/loadeddata event`);
+          audioLog(
+            'debug',
+            `HTMLAudioElement fired ready/canplay/playing event`,
+          );
           if (audio.paused) {
             tryPlay();
           }
         };
         audio.addEventListener('canplay', onCanPlay);
+        audio.addEventListener('canplaythrough', onCanPlay);
         audio.addEventListener('loadeddata', onCanPlay);
+        audio.addEventListener('playing', onCanPlay);
         return () => {
           audio.removeEventListener('canplay', onCanPlay);
+          audio.removeEventListener('canplaythrough', onCanPlay);
           audio.removeEventListener('loadeddata', onCanPlay);
+          audio.removeEventListener('playing', onCanPlay);
         };
       }
       case 'paused': {

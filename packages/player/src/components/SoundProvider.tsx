@@ -1,7 +1,7 @@
 import type { FC, PropsWithChildren } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Sound, Volume } from '@nuclearplayer/hifi';
+import { isIOSDevice, Sound, Volume } from '@nuclearplayer/hifi';
 import { useTranslation } from '@nuclearplayer/i18n';
 
 import { useCoreSetting } from '../hooks/useCoreSetting';
@@ -34,6 +34,69 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   const [muted] = useCoreSetting<boolean>('playback.muted');
   const volumePercent = muted ? 0 : Math.round((volume01 ?? 1) * 100);
   const [bypassWebAudio] = useCoreSetting<boolean>('playback.bypassWebAudio');
+
+  // Proactively unlock HTMLAudioElement on user interaction for iOS / Safari WebKit
+  useEffect(() => {
+    if (!audioElement || typeof window === 'undefined') {
+      return;
+    }
+
+    let isUnlocked = false;
+    const unlockAudio = () => {
+      if (isUnlocked || !audioElement) {
+        return;
+      }
+
+      // If no audio is loaded yet, prime with a 1-sample silent WAV to establish WebKit audio session
+      if (
+        !audioElement.src ||
+        audioElement.src === '' ||
+        audioElement.src === window.location.href
+      ) {
+        const silentWav =
+          'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        audioElement.src = silentWav;
+        const playPromise = audioElement.play();
+        if (playPromise && typeof playPromise.then === 'function') {
+          playPromise
+            .then(() => {
+              isUnlocked = true;
+              if (useSoundStore.getState().status !== 'playing') {
+                audioElement.pause();
+                audioElement.currentTime = 0;
+              }
+            })
+            .catch(() => {});
+        }
+      } else {
+        isUnlocked = true;
+      }
+    };
+
+    window.addEventListener('touchstart', unlockAudio, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener('touchend', unlockAudio, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener('pointerdown', unlockAudio, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener('click', unlockAudio, {
+      capture: true,
+      passive: true,
+    });
+
+    return () => {
+      window.removeEventListener('touchstart', unlockAudio, { capture: true });
+      window.removeEventListener('touchend', unlockAudio, { capture: true });
+      window.removeEventListener('pointerdown', unlockAudio, { capture: true });
+      window.removeEventListener('click', unlockAudio, { capture: true });
+    };
+  }, [audioElement]);
 
   useEffect(() => {
     if (crossfadeMs !== undefined) {
@@ -134,6 +197,12 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   const handleTimeUpdate = useCallback(
     ({ position, duration }: { position: number; duration: number }) => {
       useSoundStore.getState().updatePlayback(position, duration);
+      const currentItem = useQueueStore.getState().getCurrentItem();
+      if (currentItem && currentItem.status !== 'success') {
+        useQueueStore
+          .getState()
+          .updateItemState(currentItem.id, { status: 'success' });
+      }
       if (
         typeof navigator !== 'undefined' &&
         'mediaSession' in navigator &&
@@ -229,7 +298,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (!bypassWebAudio || !audioElement || !src) {
+    if (!bypassWebAudio || isIOSDevice() || !audioElement || !src) {
       return;
     }
 
@@ -307,7 +376,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         seek={seek}
         volume={volumePercent}
         preload={preload}
-        crossOrigin={crossOrigin}
+        crossOrigin={isIOSDevice() ? undefined : crossOrigin}
         onTimeUpdate={handleTimeUpdate}
         onEnd={handleEnd}
         onCanPlay={handleCanPlay}
