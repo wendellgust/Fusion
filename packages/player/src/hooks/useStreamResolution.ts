@@ -24,7 +24,7 @@ type CachedStreamResolution = {
 };
 
 // In-memory resolution cache indexed by QueueItem ID
-const streamResolutionCache = new Map<string, CachedStreamResolution>();
+export const streamResolutionCache = new Map<string, CachedStreamResolution>();
 const backgroundControllers = new Map<string, AbortController>();
 const backgroundRetryTimeouts = new Map<
   string,
@@ -152,7 +152,9 @@ const haveCandidatesGoneStale = (candidates: StreamCandidate[]): boolean => {
   });
 };
 
-const isCacheValid = (cached: CachedStreamResolution | undefined): boolean => {
+export const isCacheValid = (
+  cached: CachedStreamResolution | undefined,
+): boolean => {
   if (!cached || !cached.audioSource || !cached.candidate?.stream?.url) {
     return false;
   }

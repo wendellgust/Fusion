@@ -7,7 +7,9 @@ import { useTranslation } from '@nuclearplayer/i18n';
 import { useCoreSetting } from '../hooks/useCoreSetting';
 import {
   handleCurrentTrackFailure,
+  isCacheValid,
   reResolveCurrentTrack,
+  streamResolutionCache,
 } from '../hooks/useStreamResolution';
 import { eventBus } from '../services/eventBus';
 import { Logger } from '../services/logger';
@@ -114,6 +116,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       navigator.mediaSession.setActionHandler('play', () => {
         const audio = document.querySelector('audio');
         if (audio && audio.paused) {
+          // If paused for a long time, the stream might have stalled or aborted.
+          // Forcing load() resets the decoder and reconnects to the HTTP stream properly.
+          if (audio.networkState === 3 || audio.error) {
+            audio.load();
+          }
           audio.play().catch(() => {});
         }
         useSoundStore.getState().play();
@@ -128,8 +135,19 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         const audio = document.querySelector('audio');
         if (audio) {
-          audio.loop = true;
-          audio.src = '/api/silent.mp3';
+          const queue = useQueueStore.getState();
+          const prevItem = queue.items[queue.currentIndex - 1];
+          let targetUrl = '/api/silent.mp3';
+
+          if (prevItem) {
+            const cached = streamResolutionCache.get(prevItem.id);
+            if (isCacheValid(cached)) {
+              targetUrl = cached!.audioSource.url;
+            }
+          }
+
+          audio.loop = targetUrl.includes('/api/silent.mp3');
+          audio.src = targetUrl;
           audio.play().catch(() => {});
         }
         useQueueStore.getState().goToPrevious();
@@ -137,8 +155,19 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       navigator.mediaSession.setActionHandler('nexttrack', () => {
         const audio = document.querySelector('audio');
         if (audio) {
-          audio.loop = true;
-          audio.src = '/api/silent.mp3';
+          const queue = useQueueStore.getState();
+          const nextItem = queue.items[queue.currentIndex + 1];
+          let targetUrl = '/api/silent.mp3';
+
+          if (nextItem) {
+            const cached = streamResolutionCache.get(nextItem.id);
+            if (isCacheValid(cached)) {
+              targetUrl = cached!.audioSource.url;
+            }
+          }
+
+          audio.loop = targetUrl.includes('/api/silent.mp3');
+          audio.src = targetUrl;
           audio.play().catch(() => {});
         }
         useQueueStore.getState().goToNext();
