@@ -28,8 +28,8 @@ export const ConnectedTopBar: FC = () => {
   const openSettings = useSettingsModalStore((state) => state.open);
 
   return (
-    <TopBar draggable={frameless} className="px-2 md:px-3">
-      <div className="flex flex-row items-center gap-2 md:gap-4">
+    <TopBar draggable={frameless}>
+      <div className="flex flex-row items-center gap-4">
         <Tooltip
           content={`Fusion ${version}`}
           side="bottom"
@@ -37,32 +37,28 @@ export const ConnectedTopBar: FC = () => {
         >
           <TopBarLogo />
         </Tooltip>
-        <div className="hidden sm:block">
-          <TopBarNavigation
-            onBack={() => router.history.back()}
-            onForward={() => router.history.forward()}
-            canGoBack={canGoBack}
-            canGoForward={canGoForward}
-          />
-        </div>
+        <TopBarNavigation
+          onBack={() => router.history.back()}
+          onForward={() => router.history.forward()}
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
+        />
       </div>
       <SearchBox />
-      <div className="flex flex-row items-center justify-end gap-1 md:gap-2">
+      <div className="flex flex-row items-center justify-end gap-2">
         <ConnectedUserAccountButton />
-        <div className="hidden items-center gap-1 sm:flex md:gap-2">
-          <JamQrCodeButton />
-          <ConnectedThemeController />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => openSettings()}
-            title="Preferences"
-            aria-label="Preferences"
-            className="text-foreground hover:bg-background-secondary rounded-full"
-          >
-            <SettingsIcon size={18} />
-          </Button>
-        </div>
+        <JamQrCodeButton />
+        <ConnectedThemeController />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => openSettings()}
+          title="Preferences"
+          aria-label="Preferences"
+          className="text-foreground hover:bg-background-secondary rounded-full"
+        >
+          <SettingsIcon size={18} />
+        </Button>
       </div>
     </TopBar>
   );

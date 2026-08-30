@@ -61,15 +61,15 @@ export const ConnectedPlayerBar: FC = () => {
         />
       </div>
 
-      {/* Spotify Mobile Floating Mini-Player Bar (docked above bottom nav bar) */}
-      <div className="border-border bg-background/95 fixed right-2 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-2 z-40 block rounded-xl border p-2 shadow-2xl backdrop-blur-xl md:hidden">
+      {/* Spotify Mobile Floating Mini-Player Bar */}
+      <div className="border-border bg-background/95 fixed right-0 bottom-0 left-0 z-40 block border-t p-2 backdrop-blur-lg md:hidden">
         <ConnectedSeekBar />
         <div
           className="flex cursor-pointer items-center justify-between gap-3 px-1 py-1"
           onClick={() => setIsMobileModalOpen(true)}
         >
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="bg-background-secondary border-border size-10 shrink-0 overflow-hidden rounded-lg border shadow-sm">
+            <div className="bg-background-secondary border-border size-10 shrink-0 overflow-hidden rounded-lg border">
               {coverUrl ? (
                 <img
                   src={coverUrl}
@@ -96,21 +96,11 @@ export const ConnectedPlayerBar: FC = () => {
             className="flex items-center gap-1"
             onClick={(e) => e.stopPropagation()}
           >
-            <Button
-              size="icon"
-              variant="text"
-              onClick={toggle}
-              className="text-foreground"
-            >
-              {isPlaying ? <Pause size={22} /> : <Play size={22} />}
+            <Button size="icon" variant="text" onClick={toggle}>
+              {isPlaying ? <Pause size={20} /> : <Play size={20} />}
             </Button>
-            <Button
-              size="icon"
-              variant="text"
-              onClick={goToNext}
-              className="text-foreground"
-            >
-              <SkipForward size={22} />
+            <Button size="icon" variant="text" onClick={goToNext}>
+              <SkipForward size={20} />
             </Button>
           </div>
         </div>

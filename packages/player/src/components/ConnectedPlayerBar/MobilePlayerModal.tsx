@@ -14,7 +14,6 @@ import type { FC } from 'react';
 
 import { Button, Slider } from '@nuclearplayer/ui';
 
-import { useFavoritesStore } from '../../stores/favoritesStore';
 import { useQueueStore } from '../../stores/queueStore';
 import { useSoundStore } from '../../stores/soundStore';
 
@@ -37,23 +36,6 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
   const track = currentItem?.track;
   const { status, toggle, seek, duration, seekTo } = useSoundStore();
   const isPlaying = status === 'playing';
-
-  const isFavorite = track?.source
-    ? useFavoritesStore((s) => s.isTrackFavorite(track.source))
-    : false;
-  const addTrack = useFavoritesStore((s) => s.addTrack);
-  const removeTrack = useFavoritesStore((s) => s.removeTrack);
-
-  const handleToggleFavorite = () => {
-    if (!track) {
-      return;
-    }
-    if (isFavorite) {
-      removeTrack(track.source);
-    } else {
-      addTrack(track);
-    }
-  };
 
   const trackRecord = track as unknown as
     | {
@@ -89,15 +71,10 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
   };
 
   return (
-    <div className="bg-background/98 fixed inset-0 z-50 flex flex-col justify-between p-6 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] backdrop-blur-2xl select-none md:hidden">
+    <div className="bg-background/95 fixed inset-0 z-50 flex flex-col justify-between p-6 backdrop-blur-2xl md:hidden">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button
-          size="icon"
-          variant="text"
-          onClick={onClose}
-          className="text-foreground"
-        >
+        <Button size="icon" variant="text" onClick={onClose}>
           <ChevronDown size={28} />
         </Button>
         <div className="text-center">
@@ -121,8 +98,8 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
       </div>
 
       {/* Album Artwork */}
-      <div className="my-auto flex justify-center px-4 py-4">
-        <div className="border-border relative aspect-square w-full max-w-[300px] overflow-hidden rounded-2xl border shadow-2xl">
+      <div className="my-auto flex justify-center px-4 py-6">
+        <div className="border-border relative aspect-square w-full max-w-[320px] overflow-hidden rounded-2xl border shadow-2xl">
           {coverUrl ? (
             <img
               src={coverUrl}
@@ -140,24 +117,15 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
       {/* Track Details & Favorite */}
       <div className="mb-4 flex items-center justify-between px-2">
         <div className="min-w-0 flex-1 pr-4">
-          <h2 className="text-text truncate text-xl font-extrabold tracking-tight">
+          <h2 className="text-text truncate text-2xl font-extrabold tracking-tight">
             {trackTitle}
           </h2>
-          <p className="text-text-secondary truncate text-sm font-medium">
+          <p className="text-text-secondary truncate text-base font-medium">
             {artistName}
           </p>
         </div>
-        <Button
-          size="icon"
-          variant="text"
-          onClick={handleToggleFavorite}
-          className={
-            isFavorite
-              ? 'text-red-500 hover:text-red-600'
-              : 'text-foreground-secondary hover:text-foreground'
-          }
-        >
-          <Heart size={26} className={isFavorite ? 'fill-current' : ''} />
+        <Button size="icon" variant="text" className="text-primary">
+          <Heart size={24} />
         </Button>
       </div>
 
