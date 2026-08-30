@@ -34,6 +34,7 @@ import { ConnectedTopBar } from '../components/ConnectedTopBar';
 import { DevTools } from '../components/DevTools';
 import { FlatpakWarningBanner } from '../components/FlatpakWarningBanner';
 import { LyricsPanel } from '../components/LyricsPanel';
+import { MobileBottomNavBar } from '../components/MobileBottomNavBar';
 import { PomodoroTimer } from '../components/PomodoroTimer';
 import { SoundProvider } from '../components/SoundProvider';
 import { StreamResolver } from '../components/StreamResolver';
@@ -74,9 +75,13 @@ const RootComponent = () => {
             isCollapsed={leftSidebar.isCollapsed}
             onWidthChange={setLeftSidebarWidth}
             onToggle={toggleLeftSidebar}
+            className="hidden md:flex"
           >
-            <SidebarNavigation isCompact={leftSidebar.isCollapsed} className="h-full overflow-hidden">
-              <div className="flex flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1 pb-16 [scrollbar-width:thin]">
+            <SidebarNavigation
+              isCompact={leftSidebar.isCollapsed}
+              className="h-full overflow-hidden"
+            >
+              <div className="flex flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto pr-1 pb-16 [scrollbar-width:thin]">
                 <SidebarNavigationItem
                   to="/dashboard"
                   icon={<GaugeIcon />}
@@ -139,7 +144,7 @@ const RootComponent = () => {
             </SidebarNavigation>
           </PlayerWorkspace.LeftSidebar>
 
-          <PlayerWorkspace.Main>
+          <PlayerWorkspace.Main className="pb-36 md:pb-0">
             <RouteTransition />
           </PlayerWorkspace.Main>
 
@@ -183,6 +188,7 @@ const RootComponent = () => {
       </SoundProvider>
 
       <ConnectedPlayerBar />
+      <MobileBottomNavBar />
       <Toaster />
       <ConnectedSettingsModal />
       <DevTools />

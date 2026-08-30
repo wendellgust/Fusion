@@ -1,7 +1,10 @@
+import { LazyStore } from '@tauri-apps/plugin-store';
 import { create } from 'zustand';
-import { usePlaylistStore } from '../stores/playlistStore';
+
 import { useFavoritesStore } from '../stores/favoritesStore';
+import { usePlaylistStore } from '../stores/playlistStore';
 import { registerBuiltInWebProviders } from './builtInWebProviders';
+import { playlistFileService } from './playlistFileService';
 
 export type UserProfile = {
   username: string;
@@ -21,11 +24,14 @@ type AuthState = {
 };
 
 const AUTH_STORAGE_KEY = 'nuclear_web_auth_user';
+let isHydratedFromServer = false;
 
 function getStoredAuth(): UserProfile | null {
   try {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      return JSON.parse(raw);
+    }
   } catch {
     /* ignore */
   }
@@ -45,7 +51,9 @@ function setStoredAuth(user: UserProfile | null) {
 }
 
 function clearWebStorageForAccountSwitch() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') {
+    return;
+  }
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -90,7 +98,9 @@ function dumpAllUserConfiguration() {
 }
 
 function restoreAllUserConfiguration(dump: Record<string, string>) {
-  if (!dump || typeof window === 'undefined') return;
+  if (!dump || typeof window === 'undefined') {
+    return;
+  }
   Object.entries(dump).forEach(([k, v]) => {
     if (typeof v === 'string' && k !== AUTH_STORAGE_KEY) {
       localStorage.setItem(k, v);
@@ -105,6 +115,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (username: string, password: string) => {
     set({ isLoading: true, error: null });
+    isHydratedFromServer = false;
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -129,10 +140,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user, isLoading: false });
 
       await get().fetchDataFromServer();
+      isHydratedFromServer = true;
       registerBuiltInWebProviders();
       return true;
-    } catch (err: any) {
-      set({ error: err.message || 'Login error', isLoading: false });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Login error';
+      set({ error: msg, isLoading: false });
       return false;
     }
   },
@@ -162,16 +175,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       setStoredAuth(user);
       set({ user, isLoading: false });
 
+      isHydratedFromServer = true;
       await get().syncDataToServer();
       registerBuiltInWebProviders();
       return true;
-    } catch (err: any) {
-      set({ error: err.message || 'Registration error', isLoading: false });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration error';
+      set({ error: msg, isLoading: false });
       return false;
     }
   },
 
   logout: () => {
+    isHydratedFromServer = false;
     setStoredAuth(null);
     clearWebStorageForAccountSwitch();
     useFavoritesStore.setState({ tracks: [], albums: [], artists: [] });
@@ -181,6 +197,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   syncDataToServer: async () => {
+    if (!isHydratedFromServer) {
+      return;
+    }
     const { user } = get();
     const token = user?.token || 'default-token';
 
@@ -195,6 +214,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const payload = {
         token,
+        username: user?.username,
         data: {
           playlists: playlistsIndex || [],
           fullPlaylists: fullPlaylists || [],
@@ -209,7 +229,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       await fetch('/api/user/data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-username': user?.username || '',
+        },
         body: JSON.stringify(payload),
       });
     } catch (err) {
@@ -220,10 +244,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   fetchDataFromServer: async () => {
     const { user } = get();
     const token = user?.token || 'default-token';
+    const username = user?.username || '';
 
     try {
-      const res = await fetch(`/api/user/data?token=${token}`);
-      if (!res.ok) return;
+      const res = await fetch(
+        `/api/user/data?token=${encodeURIComponent(token)}&username=${encodeURIComponent(username)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'x-username': username,
+          },
+        },
+      );
+      if (!res.ok) {
+        return;
+      }
       const json = await res.json();
       if (json.success && json.data) {
         const { playlists, fullPlaylists, favorites, storageDump } = json.data;
@@ -238,43 +273,77 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           const localIndex = usePlaylistStore.getState().index || [];
           const mergedIndexMap = new Map();
           for (const item of localIndex) {
-            if (item && item.id) mergedIndexMap.set(item.id, item);
+            if (item && item.id) {
+              mergedIndexMap.set(item.id, item);
+            }
           }
           for (const item of playlists) {
-            if (item && item.id) mergedIndexMap.set(item.id, item);
+            if (item && item.id) {
+              mergedIndexMap.set(item.id, item);
+            }
           }
           const mergedIndex = Array.from(mergedIndexMap.values());
           usePlaylistStore.setState({ index: mergedIndex, loaded: true });
         }
-        if (fullPlaylists && Array.isArray(fullPlaylists)) {
+
+        if (
+          fullPlaylists &&
+          Array.isArray(fullPlaylists) &&
+          fullPlaylists.length > 0
+        ) {
           const map = new Map(usePlaylistStore.getState().playlists);
           for (const pl of fullPlaylists) {
             if (pl && pl.id) {
               map.set(pl.id, pl);
+              try {
+                await playlistFileService.savePlaylist(pl);
+              } catch {
+                /* ignore */
+              }
             }
           }
           usePlaylistStore.setState({ playlists: map });
         }
+
         if (favorites) {
+          const tracks = favorites.tracks || [];
+          const albums = favorites.albums || [];
+          const artists = favorites.artists || [];
           useFavoritesStore.setState({
-            tracks: favorites.tracks || [],
-            albums: favorites.albums || [],
-            artists: favorites.artists || [],
+            tracks,
+            albums,
+            artists,
             loaded: true,
           });
+
+          try {
+            const favStore = new LazyStore('favorites.json');
+            await favStore.set('favorites.tracks', tracks);
+            await favStore.set('favorites.albums', albums);
+            await favStore.set('favorites.artists', artists);
+            await favStore.save();
+          } catch {
+            /* ignore */
+          }
         }
       }
     } catch (err) {
       console.warn('Failed to fetch user data from server:', err);
     } finally {
+      isHydratedFromServer = true;
       registerBuiltInWebProviders();
     }
   },
 }));
 
-let syncTimer: any = null;
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleAutoSync() {
-  if (syncTimer) clearTimeout(syncTimer);
+  if (!isHydratedFromServer) {
+    return;
+  }
+  if (syncTimer) {
+    clearTimeout(syncTimer);
+  }
   syncTimer = setTimeout(() => {
     useAuthStore.getState().syncDataToServer();
   }, 1000);
@@ -288,5 +357,5 @@ if (typeof window !== 'undefined') {
   setTimeout(() => {
     registerBuiltInWebProviders();
     useAuthStore.getState().fetchDataFromServer();
-  }, 100);
+  }, 50);
 }

@@ -14,6 +14,7 @@ import type { FC } from 'react';
 
 import { Button, Slider } from '@nuclearplayer/ui';
 
+import { useFavoritesStore } from '../../stores/favoritesStore';
 import { useQueueStore } from '../../stores/queueStore';
 import { useSoundStore } from '../../stores/soundStore';
 
@@ -26,7 +27,9 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   const currentItem = useQueueStore((state) => state.getCurrentItem());
   const goToNext = useQueueStore((state) => state.goToNext);
@@ -35,33 +38,70 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
   const { status, toggle, seek, duration, seekTo } = useSoundStore();
   const isPlaying = status === 'playing';
 
-  const trackTitle = (track as any)?.name || (track as any)?.title || 'No Track Selected';
+  const isFavorite = track?.source
+    ? useFavoritesStore((s) => s.isTrackFavorite(track.source))
+    : false;
+  const addTrack = useFavoritesStore((s) => s.addTrack);
+  const removeTrack = useFavoritesStore((s) => s.removeTrack);
+
+  const handleToggleFavorite = () => {
+    if (!track) {
+      return;
+    }
+    if (isFavorite) {
+      removeTrack(track.source);
+    } else {
+      addTrack(track);
+    }
+  };
+
+  const trackRecord = track as unknown as
+    | {
+        name?: string;
+        title?: string;
+        artist?: string;
+        artists?: Array<{ name: string }>;
+        thumbnail?: string;
+        album?: {
+          artwork?: { items?: Array<{ url: string }> };
+          coverImage?: string;
+        };
+      }
+    | undefined;
+
+  const trackTitle =
+    trackRecord?.title || trackRecord?.name || 'No Track Selected';
   const artistName =
-    (track as any)?.artist ||
-    (track as any)?.artists?.[0]?.name ||
-    'Unknown Artist';
+    trackRecord?.artist || trackRecord?.artists?.[0]?.name || 'Unknown Artist';
   const coverUrl =
-    (track as any)?.thumbnail ||
-    (track as any)?.album?.artwork?.items?.[0]?.url ||
-    (track as any)?.album?.coverImage ||
+    trackRecord?.thumbnail ||
+    trackRecord?.album?.artwork?.items?.[0]?.url ||
+    trackRecord?.album?.coverImage ||
     '';
 
   const formatTime = (seconds: number) => {
-    if (!seconds || isNaN(seconds)) return '0:00';
+    if (!seconds || isNaN(seconds)) {
+      return '0:00';
+    }
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div className="bg-background/95 fixed inset-0 z-50 flex flex-col justify-between p-6 backdrop-blur-2xl md:hidden">
+    <div className="bg-background/98 fixed inset-0 z-50 flex flex-col justify-between p-6 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] backdrop-blur-2xl select-none md:hidden">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button size="icon" variant="text" onClick={onClose}>
+        <Button
+          size="icon"
+          variant="text"
+          onClick={onClose}
+          className="text-foreground"
+        >
           <ChevronDown size={28} />
         </Button>
         <div className="text-center">
-          <div className="text-text-secondary text-xs uppercase tracking-wider font-semibold">
+          <div className="text-text-secondary text-xs font-semibold tracking-wider uppercase">
             Playing from Queue
           </div>
           <div className="text-text max-w-[200px] truncate text-sm font-bold">
@@ -69,15 +109,20 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
           </div>
         </div>
         <Link to="/visualizer" onClick={onClose}>
-          <Button size="icon" variant="text" className="text-primary hover:text-foreground" aria-label="Visualizer">
+          <Button
+            size="icon"
+            variant="text"
+            className="text-primary hover:text-foreground"
+            aria-label="Visualizer"
+          >
             <Activity size={22} />
           </Button>
         </Link>
       </div>
 
       {/* Album Artwork */}
-      <div className="my-auto flex justify-center px-4 py-6">
-        <div className="border-border shadow-2xl relative aspect-square w-full max-w-[320px] overflow-hidden rounded-2xl border">
+      <div className="my-auto flex justify-center px-4 py-4">
+        <div className="border-border relative aspect-square w-full max-w-[300px] overflow-hidden rounded-2xl border shadow-2xl">
           {coverUrl ? (
             <img
               src={coverUrl}
@@ -95,15 +140,24 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
       {/* Track Details & Favorite */}
       <div className="mb-4 flex items-center justify-between px-2">
         <div className="min-w-0 flex-1 pr-4">
-          <h2 className="text-text truncate text-2xl font-extrabold tracking-tight">
+          <h2 className="text-text truncate text-xl font-extrabold tracking-tight">
             {trackTitle}
           </h2>
-          <p className="text-text-secondary truncate text-base font-medium">
+          <p className="text-text-secondary truncate text-sm font-medium">
             {artistName}
           </p>
         </div>
-        <Button size="icon" variant="text" className="text-primary">
-          <Heart size={24} />
+        <Button
+          size="icon"
+          variant="text"
+          onClick={handleToggleFavorite}
+          className={
+            isFavorite
+              ? 'text-red-500 hover:text-red-600'
+              : 'text-foreground-secondary hover:text-foreground'
+          }
+        >
+          <Heart size={26} className={isFavorite ? 'fill-current' : ''} />
         </Button>
       </div>
 
@@ -134,7 +188,11 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
           onClick={toggle}
           className="bg-primary text-primary-foreground flex size-16 items-center justify-center rounded-full shadow-lg"
         >
-          {isPlaying ? <Pause size={32} /> : <Play size={32} className="ml-1" />}
+          {isPlaying ? (
+            <Pause size={32} />
+          ) : (
+            <Play size={32} className="ml-1" />
+          )}
         </Button>
         <Button size="icon" variant="text" onClick={goToNext}>
           <SkipForward size={32} />
