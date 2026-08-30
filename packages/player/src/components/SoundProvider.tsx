@@ -104,7 +104,58 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     }
   }, [crossfadeMs]);
 
-  // Hook up Web MediaSession API for iPhone / Android Lockscreen / Bluetooth Media Controls
+  // Register MediaSession action handlers permanently so iOS never loses background callback references
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) {
+      return;
+    }
+
+    try {
+      navigator.mediaSession.setActionHandler('play', () => {
+        const audio = document.querySelector('audio');
+        if (audio && audio.paused) {
+          audio.play().catch(() => {});
+        }
+        useSoundStore.getState().play();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        const audio = document.querySelector('audio');
+        if (audio && !audio.paused) {
+          audio.pause();
+        }
+        useSoundStore.getState().pause();
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        useQueueStore.getState().goToPrevious();
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        useQueueStore.getState().goToNext();
+      });
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined) {
+          const audio = document.querySelector('audio');
+          if (audio) {
+            audio.currentTime = details.seekTime;
+          }
+          useSoundStore.getState().seekTo(details.seekTime);
+        }
+      });
+      // Explicitly disable seekbackward/seekforward handlers so iOS renders Previous/Next track buttons
+      navigator.mediaSession.setActionHandler('seekbackward', null);
+      navigator.mediaSession.setActionHandler('seekforward', null);
+      navigator.mediaSession.setActionHandler('stop', () => {
+        const audio = document.querySelector('audio');
+        if (audio) {
+          audio.pause();
+        }
+        useSoundStore.getState().stop();
+      });
+    } catch {
+      /* ignore unsupported actions */
+    }
+  }, []);
+
+  // Sync playback state and metadata to lockscreen
   useEffect(() => {
     if (typeof window === 'undefined' || !('mediaSession' in navigator)) {
       return;
@@ -164,47 +215,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         /* ignore invalid metadata */
       }
     }
-
-    try {
-      navigator.mediaSession.setActionHandler('play', () => {
-        if (audioElement && audioElement.paused) {
-          audioElement.play().catch(() => {});
-        }
-        useSoundStore.getState().play();
-      });
-      navigator.mediaSession.setActionHandler('pause', () => {
-        if (audioElement && !audioElement.paused) {
-          audioElement.pause();
-        }
-        useSoundStore.getState().pause();
-      });
-      navigator.mediaSession.setActionHandler('previoustrack', () => {
-        useQueueStore.getState().goToPrevious();
-      });
-      navigator.mediaSession.setActionHandler('nexttrack', () => {
-        useQueueStore.getState().goToNext();
-      });
-      navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (details.seekTime !== undefined) {
-          if (audioElement) {
-            audioElement.currentTime = details.seekTime;
-          }
-          useSoundStore.getState().seekTo(details.seekTime);
-        }
-      });
-      // Explicitly disable seekbackward/seekforward handlers so iOS renders Previous/Next track buttons
-      navigator.mediaSession.setActionHandler('seekbackward', null);
-      navigator.mediaSession.setActionHandler('seekforward', null);
-      navigator.mediaSession.setActionHandler('stop', () => {
-        if (audioElement) {
-          audioElement.pause();
-        }
-        useSoundStore.getState().stop();
-      });
-    } catch {
-      /* ignore unsupported actions */
-    }
-  }, [src, status, audioElement]);
+  }, [src, status]);
 
   const handleTimeUpdate = useCallback(
     ({ position, duration }: { position: number; duration: number }) => {
