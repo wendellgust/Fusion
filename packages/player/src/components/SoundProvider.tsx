@@ -233,7 +233,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         try {
           navigator.mediaSession.setPositionState({
             duration,
-            playbackRate: 1,
+            playbackRate: useSoundStore.getState().status === 'playing' ? 1 : 0,
             position,
           });
         } catch {

@@ -121,10 +121,10 @@ export const usePlaybackStatus = (
         const onCanPlay = () => {
           audioLog(
             'debug',
-            `HTMLAudioElement fired ready/canplay/playing event`,
+            `HTMLAudioElement fired ready/canplay/playing event. paused=${audio.paused}`,
           );
-          if (audio.paused) {
-            tryPlay();
+          if (status === 'playing') {
+            audio.play().catch(() => {});
           }
         };
         audio.addEventListener('canplay', onCanPlay);
