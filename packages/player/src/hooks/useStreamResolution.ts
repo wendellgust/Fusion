@@ -479,6 +479,13 @@ const resolveCurrentStream = async (
 
   updateItemState(item.id, { status: 'loading', error: undefined });
 
+  if (autoPlay) {
+    // Prime the native audio element immediately with the HTTP silent stream from server
+    // This establishes a genuine HTTP Apple AVPlayer session that survives in background
+    setSrc({ url: '/api/silent.mp3', protocol: 'http' });
+    play();
+  }
+
   // 1st attempt to resolve track stream
   let result = await resolveTrackAudioSource(item, signal);
   if (signal.aborted) {

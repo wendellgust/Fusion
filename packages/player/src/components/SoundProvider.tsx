@@ -221,8 +221,9 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     ({ position, duration }: { position: number; duration: number }) => {
       const currentSrc = useSoundStore.getState().src?.url;
       if (
-        currentSrc &&
-        currentSrc.startsWith('data:audio/wav;base64,UklGRjQ')
+        !currentSrc ||
+        currentSrc.includes('/api/silent.mp3') ||
+        currentSrc.startsWith('data:audio')
       ) {
         return;
       }
@@ -261,7 +262,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
   const handleEnd = useCallback(() => {
     const currentSrc = useSoundStore.getState().src?.url;
-    if (currentSrc && currentSrc.startsWith('data:audio/wav;base64,UklGRjQ')) {
+    if (
+      !currentSrc ||
+      currentSrc.includes('/api/silent.mp3') ||
+      currentSrc.startsWith('data:audio')
+    ) {
       return;
     }
     const currentItem = useQueueStore.getState().getCurrentItem();
@@ -278,7 +283,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
   const handleCanPlay = useCallback(() => {
     const currentSrc = useSoundStore.getState().src?.url;
-    if (currentSrc && currentSrc.startsWith('data:audio/wav;base64,UklGRjQ')) {
+    if (
+      !currentSrc ||
+      currentSrc.includes('/api/silent.mp3') ||
+      currentSrc.startsWith('data:audio')
+    ) {
       return;
     }
     if (pendingSeekRef.current !== null) {
@@ -301,8 +310,9 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     (error: Error) => {
       const currentSrc = useSoundStore.getState().src?.url;
       if (
-        currentSrc &&
-        currentSrc.startsWith('data:audio/wav;base64,UklGRjQ')
+        !currentSrc ||
+        currentSrc.includes('/api/silent.mp3') ||
+        currentSrc.startsWith('data:audio')
       ) {
         return;
       }
