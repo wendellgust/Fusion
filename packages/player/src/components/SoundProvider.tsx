@@ -167,9 +167,15 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
     try {
       navigator.mediaSession.setActionHandler('play', () => {
+        if (audioElement && audioElement.paused) {
+          audioElement.play().catch(() => {});
+        }
         useSoundStore.getState().play();
       });
       navigator.mediaSession.setActionHandler('pause', () => {
+        if (audioElement && !audioElement.paused) {
+          audioElement.pause();
+        }
         useSoundStore.getState().pause();
       });
       navigator.mediaSession.setActionHandler('previoustrack', () => {
@@ -180,6 +186,9 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       });
       navigator.mediaSession.setActionHandler('seekto', (details) => {
         if (details.seekTime !== undefined) {
+          if (audioElement) {
+            audioElement.currentTime = details.seekTime;
+          }
           useSoundStore.getState().seekTo(details.seekTime);
         }
       });
@@ -187,12 +196,15 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       navigator.mediaSession.setActionHandler('seekbackward', null);
       navigator.mediaSession.setActionHandler('seekforward', null);
       navigator.mediaSession.setActionHandler('stop', () => {
+        if (audioElement) {
+          audioElement.pause();
+        }
         useSoundStore.getState().stop();
       });
     } catch {
       /* ignore unsupported actions */
     }
-  }, [src, status]);
+  }, [src, status, audioElement]);
 
   const handleTimeUpdate = useCallback(
     ({ position, duration }: { position: number; duration: number }) => {
