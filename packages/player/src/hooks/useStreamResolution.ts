@@ -479,13 +479,6 @@ const resolveCurrentStream = async (
 
   updateItemState(item.id, { status: 'loading', error: undefined });
 
-  if (autoPlay) {
-    // Prime the HTMLAudioElement immediately with silent audio inside the user click gesture
-    // This establishes the WebKit / iOS audio session before async network resolution begins
-    setSrc({ url: SILENT_AUDIO_PLACEHOLDER, protocol: 'http' });
-    play();
-  }
-
   // 1st attempt to resolve track stream
   let result = await resolveTrackAudioSource(item, signal);
   if (signal.aborted) {
