@@ -109,6 +109,7 @@ export function setThemeId(id: string): void {
   if (!root.getAttribute('data-theme')) {
     root.setAttribute('data-theme', 'dark');
   }
+  root.classList.add('dark');
 }
 
 export function setBasicTheme(id: string): void {

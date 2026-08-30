@@ -42,10 +42,11 @@ export const SidebarNavigationItem: FC<SidebarNavigationItemProps> = ({
             onClick={onClick}
             data-testid="sidebar-navigation-item"
             className={cn(
-              'flex w-full items-center overflow-hidden rounded-md border-(length:--border-width)',
+              'text-foreground-secondary hover:text-foreground flex w-full items-center overflow-hidden rounded-md border-(length:--border-width) transition-colors',
               {
                 'cursor-pointer': onClick,
-                'bg-primary border-border font-bold': active,
+                'bg-primary text-primary-foreground border-border font-bold':
+                  active,
                 'hover:bg-background-secondary border-transparent': !active,
               },
             )}

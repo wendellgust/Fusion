@@ -287,10 +287,20 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
     if (repeatMode === 'one') {
       useSoundStore.getState().seekTo(0);
+      useSoundStore.getState().play();
       return;
     }
 
-    get().goToNext();
+    const state = get();
+    const nextIndex = getDirectionalIndex(state, 'forward');
+    if (nextIndex !== state.currentIndex) {
+      set({ currentIndex: nextIndex });
+      Logger.queue.debug(`Advanced to next track on end (index ${nextIndex})`);
+    } else if (repeatMode === 'all' && state.items.length > 0) {
+      set({ currentIndex: 0 });
+    } else {
+      useSoundStore.getState().stop();
+    }
   },
 
   goToIndex: withPersistence((index: number) => {
@@ -325,41 +335,39 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     return items[currentIndex];
   },
 
-  moveFailedCurrentItemToCacheEnd: withPersistence(
-    (cacheWindowSize = 5) => {
-      const { items } = get();
-      if (items.length <= 1) {
-        return;
-      }
+  moveFailedCurrentItemToCacheEnd: withPersistence((cacheWindowSize = 5) => {
+    const { items } = get();
+    if (items.length <= 1) {
+      return;
+    }
 
-      set(
-        produce((state: QueueStore) => {
-          if (
-            state.currentIndex < 0 ||
-            state.currentIndex >= state.items.length
-          ) {
-            return;
-          }
+    set(
+      produce((state: QueueStore) => {
+        if (
+          state.currentIndex < 0 ||
+          state.currentIndex >= state.items.length
+        ) {
+          return;
+        }
 
-          const [failedItem] = state.items.splice(state.currentIndex, 1);
-          failedItem.status = 'idle';
-          failedItem.error = undefined;
+        const [failedItem] = state.items.splice(state.currentIndex, 1);
+        failedItem.status = 'idle';
+        failedItem.error = undefined;
 
-          // Insert after the remaining cached window (index currentIndex + cacheWindowSize)
-          // Advancing the 6th item (index currentIndex + 5 original) to the 5th spot
-          const targetIndex = Math.min(
-            state.currentIndex + cacheWindowSize,
-            state.items.length,
-          );
-          state.items.splice(targetIndex, 0, failedItem);
+        // Insert after the remaining cached window (index currentIndex + cacheWindowSize)
+        // Advancing the 6th item (index currentIndex + 5 original) to the 5th spot
+        const targetIndex = Math.min(
+          state.currentIndex + cacheWindowSize,
+          state.items.length,
+        );
+        state.items.splice(targetIndex, 0, failedItem);
 
-          if (state.currentIndex >= state.items.length) {
-            state.currentIndex = Math.max(0, state.items.length - 1);
-          }
-        }),
-      );
-    },
-  ),
+        if (state.currentIndex >= state.items.length) {
+          state.currentIndex = Math.max(0, state.items.length - 1);
+        }
+      }),
+    );
+  }),
 }));
 
 export const initializeQueueStore = async (): Promise<void> => {

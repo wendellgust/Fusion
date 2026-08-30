@@ -26,7 +26,10 @@ type CachedStreamResolution = {
 // In-memory resolution cache indexed by QueueItem ID
 const streamResolutionCache = new Map<string, CachedStreamResolution>();
 const backgroundControllers = new Map<string, AbortController>();
-const backgroundRetryTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+const backgroundRetryTimeouts = new Map<
+  string,
+  ReturnType<typeof setTimeout>
+>();
 const backgroundRetryCounts = new Map<string, number>();
 
 let activeMainController: AbortController | null = null;
@@ -135,8 +138,9 @@ const updateItemCandidates = (
 
 const haveCandidatesGoneStale = (candidates: StreamCandidate[]): boolean => {
   const expiryMs =
-    (useSettingsStore.getState().getValue('playback.streamExpiryMs') as number) ||
-    3600000;
+    (useSettingsStore
+      .getState()
+      .getValue('playback.streamExpiryMs') as number) || 3600000;
   const now = Date.now();
 
   return candidates.some((candidate) => {
@@ -153,8 +157,9 @@ const isCacheValid = (cached: CachedStreamResolution | undefined): boolean => {
     return false;
   }
   const expiryMs =
-    (useSettingsStore.getState().getValue('playback.streamExpiryMs') as number) ||
-    3600000;
+    (useSettingsStore
+      .getState()
+      .getValue('playback.streamExpiryMs') as number) || 3600000;
   return Date.now() - cached.resolvedAt < expiryMs;
 };
 
@@ -453,11 +458,7 @@ const resolveCurrentStream = async (
   const { signal } = activeMainController;
 
   const { updateItemState } = useQueueStore.getState();
-  const { setSrc, play, stop } = useSoundStore.getState();
-
-  if (autoPlay) {
-    stop();
-  }
+  const { setSrc, play } = useSoundStore.getState();
 
   // Refresh 5-track cache window (prefetch tracks 2..5, and when track 1 ends, track 6 enters window)
   updateCacheWindow(t);
@@ -585,8 +586,14 @@ export const useStreamResolution = (): void => {
 
       if (!force && currentItem.id === currentItemIdRef.current) {
         const soundState = useSoundStore.getState();
-        if (soundState.status === 'playing' && (!soundState.src || !soundState.src.url)) {
-          console.log('[StreamResolution] Current item active without src, resolving:', currentItem.track.title);
+        if (
+          soundState.status === 'playing' &&
+          (!soundState.src || !soundState.src.url)
+        ) {
+          console.log(
+            '[StreamResolution] Current item active without src, resolving:',
+            currentItem.track.title,
+          );
           void resolveCurrentStream(currentItem, t, true);
         }
         return;
@@ -617,7 +624,12 @@ export const useStreamResolution = (): void => {
       const autoPlay = !isFirstResolutionRef.current;
       isFirstResolutionRef.current = false;
       currentItemIdRef.current = currentItem.id;
-      console.log('[StreamResolution] Resolving current track:', currentItem.track.title, 'autoPlay:', autoPlay);
+      console.log(
+        '[StreamResolution] Resolving current track:',
+        currentItem.track.title,
+        'autoPlay:',
+        autoPlay,
+      );
       void resolveCurrentStream(currentItem, t, autoPlay);
     };
 
@@ -629,7 +641,10 @@ export const useStreamResolution = (): void => {
       if (state.status === 'playing' && (!state.src || !state.src.url)) {
         const currentItem = useQueueStore.getState().getCurrentItem();
         if (currentItem) {
-          console.log('[StreamResolution] Play triggered with empty src for track:', currentItem.track.title);
+          console.log(
+            '[StreamResolution] Play triggered with empty src for track:',
+            currentItem.track.title,
+          );
           void resolveCurrentStream(currentItem, t, true);
         }
       }
