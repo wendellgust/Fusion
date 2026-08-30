@@ -164,6 +164,7 @@ export const Sound: React.FC<SoundProps> = ({
       <audio
         ref={handleAudioRef}
         playsInline
+        loop={src?.url?.includes('/api/silent.mp3')}
         style={{
           position: 'fixed',
           top: '-9999px',

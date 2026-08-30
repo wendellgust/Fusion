@@ -126,9 +126,21 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         useSoundStore.getState().pause();
       });
       navigator.mediaSession.setActionHandler('previoustrack', () => {
+        const audio = document.querySelector('audio');
+        if (audio) {
+          audio.loop = true;
+          audio.src = '/api/silent.mp3';
+          audio.play().catch(() => {});
+        }
         useQueueStore.getState().goToPrevious();
       });
       navigator.mediaSession.setActionHandler('nexttrack', () => {
+        const audio = document.querySelector('audio');
+        if (audio) {
+          audio.loop = true;
+          audio.src = '/api/silent.mp3';
+          audio.play().catch(() => {});
+        }
         useQueueStore.getState().goToNext();
       });
       navigator.mediaSession.setActionHandler('seekto', (details) => {
@@ -268,6 +280,12 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       currentSrc.startsWith('data:audio')
     ) {
       return;
+    }
+    const audio = document.querySelector('audio');
+    if (audio) {
+      audio.loop = true;
+      audio.src = '/api/silent.mp3';
+      audio.play().catch(() => {});
     }
     const currentItem = useQueueStore.getState().getCurrentItem();
     if (currentItem) {
