@@ -125,24 +125,38 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       }
     };
 
+    const syncPositionState = (audio: HTMLAudioElement, rate: number) => {
+      if (
+        navigator.mediaSession.setPositionState &&
+        audio.duration > 0 &&
+        isFinite(audio.duration)
+      ) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: audio.duration,
+            position: Math.min(audio.currentTime, audio.duration),
+            playbackRate: rate,
+          });
+        } catch {
+          // Ignore invalid state
+        }
+      }
+    };
+
     const handlePlay = () => {
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
         if (audio.networkState === 3 || audio.error) {
           audio.load();
         }
-        audio.play().catch(() => {});
-        if (navigator.mediaSession.setPositionState && audio.duration > 0) {
-          try {
-            navigator.mediaSession.setPositionState({
-              duration: audio.duration,
-              position: audio.currentTime,
-              playbackRate: 1,
-            });
-          } catch {
-            // Ignore error
-          }
-        }
+        audio.play().catch(() => {
+          /* ignore */
+        });
+      }
+      // Sync directly — React useEffect does NOT run when tab is backgrounded
+      navigator.mediaSession.playbackState = 'playing';
+      if (audio) {
+        syncPositionState(audio, 1);
       }
       useSoundStore.getState().play();
     };
@@ -151,17 +165,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       const audio = document.querySelector('audio');
       if (audio && !audio.paused) {
         audio.pause();
-        if (navigator.mediaSession.setPositionState && audio.duration > 0) {
-          try {
-            navigator.mediaSession.setPositionState({
-              duration: audio.duration,
-              position: audio.currentTime,
-              playbackRate: 0,
-            });
-          } catch {
-            // Ignore error
-          }
-        }
+      }
+      // Sync directly — React useEffect does NOT run when tab is backgrounded
+      navigator.mediaSession.playbackState = 'paused';
+      if (audio) {
+        syncPositionState(audio, 0);
       }
       useSoundStore.getState().pause();
     };
@@ -182,8 +190,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
         audio.loop = targetUrl.includes('/api/silent.mp3');
         audio.src = targetUrl;
-        audio.play().catch(() => {});
+        audio.play().catch(() => {
+          /* ignore */
+        });
       }
+      navigator.mediaSession.playbackState = 'playing';
       useQueueStore.getState().goToPrevious();
     };
 
@@ -203,8 +214,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
         audio.loop = targetUrl.includes('/api/silent.mp3');
         audio.src = targetUrl;
-        audio.play().catch(() => {});
+        audio.play().catch(() => {
+          /* ignore */
+        });
       }
+      navigator.mediaSession.playbackState = 'playing';
       useQueueStore.getState().goToNext();
     };
 
@@ -213,7 +227,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('previoustrack', handlePrevious);
     registerHandler('nexttrack', handleNext);
 
-    // Fallback: If iOS insists on showing skip 10s/15s buttons, make them skip the entire track as requested.
+    // Map skip-10s/15s buttons to full track skip (iOS forces these on streaming audio)
     registerHandler('seekbackward', handlePrevious);
     registerHandler('seekforward', handleNext);
 
@@ -222,6 +236,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         const audio = document.querySelector('audio');
         if (audio) {
           audio.currentTime = details.seekTime;
+          syncPositionState(audio, audio.paused ? 0 : 1);
         }
         useSoundStore.getState().seekTo(details.seekTime);
       }
@@ -232,6 +247,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       if (audio) {
         audio.pause();
       }
+      navigator.mediaSession.playbackState = 'none';
       useSoundStore.getState().stop();
     });
   }, []);
