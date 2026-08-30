@@ -196,6 +196,13 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
   const handleTimeUpdate = useCallback(
     ({ position, duration }: { position: number; duration: number }) => {
+      const currentSrc = useSoundStore.getState().src?.url;
+      if (
+        currentSrc &&
+        currentSrc.startsWith('data:audio/wav;base64,UklGRjQ')
+      ) {
+        return;
+      }
       useSoundStore.getState().updatePlayback(position, duration);
       const currentItem = useQueueStore.getState().getCurrentItem();
       if (currentItem && currentItem.status !== 'success') {
@@ -230,6 +237,10 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   );
 
   const handleEnd = useCallback(() => {
+    const currentSrc = useSoundStore.getState().src?.url;
+    if (currentSrc && currentSrc.startsWith('data:audio/wav;base64,UklGRjQ')) {
+      return;
+    }
     const currentItem = useQueueStore.getState().getCurrentItem();
     if (currentItem) {
       eventBus.emit('trackFinished', currentItem.track);
@@ -243,6 +254,10 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   }, [autoRemovePlayed]);
 
   const handleCanPlay = useCallback(() => {
+    const currentSrc = useSoundStore.getState().src?.url;
+    if (currentSrc && currentSrc.startsWith('data:audio/wav;base64,UklGRjQ')) {
+      return;
+    }
     if (pendingSeekRef.current !== null) {
       const seekTarget = pendingSeekRef.current;
       pendingSeekRef.current = null;
@@ -261,6 +276,13 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
   const handleError = useCallback(
     (error: Error) => {
+      const currentSrc = useSoundStore.getState().src?.url;
+      if (
+        currentSrc &&
+        currentSrc.startsWith('data:audio/wav;base64,UklGRjQ')
+      ) {
+        return;
+      }
       if (error.message === 'stream:expired') {
         const savedTime = audioElement?.currentTime ?? 0;
         pendingSeekRef.current = savedTime > 1 ? savedTime : null;

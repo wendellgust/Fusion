@@ -448,6 +448,9 @@ export const handleCurrentTrackFailure = (t: TFunction): void => {
   }, 1000);
 };
 
+export const SILENT_AUDIO_PLACEHOLDER =
+  'data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YRAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
 const resolveCurrentStream = async (
   item: QueueItem,
   t: TFunction,
@@ -475,6 +478,13 @@ const resolveCurrentStream = async (
   }
 
   updateItemState(item.id, { status: 'loading', error: undefined });
+
+  if (autoPlay) {
+    // Prime the HTMLAudioElement immediately with silent audio inside the user click gesture
+    // This establishes the WebKit / iOS audio session before async network resolution begins
+    setSrc({ url: SILENT_AUDIO_PLACEHOLDER, protocol: 'http' });
+    play();
+  }
 
   // 1st attempt to resolve track stream
   let result = await resolveTrackAudioSource(item, signal);
@@ -621,8 +631,13 @@ export const useStreamResolution = (): void => {
       }
 
       consecutiveSkipsRef.current = 0;
-      const autoPlay = !isFirstResolutionRef.current;
-      isFirstResolutionRef.current = false;
+      // Do not autoplay on initial cold boot if queue was loaded from disk and player was stopped
+      const isInitialColdBoot =
+        !isFirstResolutionRef.current &&
+        useSoundStore.getState().status !== 'playing';
+      isFirstResolutionRef.current = true;
+      const autoPlay = !isInitialColdBoot;
+
       currentItemIdRef.current = currentItem.id;
       console.log(
         '[StreamResolution] Resolving current track:',
