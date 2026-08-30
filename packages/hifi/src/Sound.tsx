@@ -163,8 +163,16 @@ export const Sound: React.FC<SoundProps> = ({
     <>
       <audio
         ref={handleAudioRef}
-        hidden
         playsInline
+        style={{
+          position: 'fixed',
+          top: '-9999px',
+          left: '-9999px',
+          width: '1px',
+          height: '1px',
+          opacity: 0.001,
+          pointerEvents: 'none',
+        }}
         preload={preload}
         crossOrigin={
           effectiveBypassWebAudio ? undefined : crossOrigin || undefined

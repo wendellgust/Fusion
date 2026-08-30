@@ -266,7 +266,6 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     const state = get();
     const nextIndex = getDirectionalIndex(state, 'forward');
     if (nextIndex !== state.currentIndex) {
-      useSoundStore.getState().stop();
       set({ currentIndex: nextIndex });
       Logger.queue.debug(`Moved to next track (index ${nextIndex})`);
     }
@@ -276,7 +275,6 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     const state = get();
     const previousIndex = getDirectionalIndex(state, 'backward');
     if (previousIndex !== state.currentIndex) {
-      useSoundStore.getState().stop();
       set({ currentIndex: previousIndex });
       Logger.queue.debug(`Moved to previous track (index ${previousIndex})`);
     }
@@ -310,7 +308,6 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         useSoundStore.getState().seekTo(0);
         useSoundStore.getState().play();
       } else {
-        useSoundStore.getState().stop();
         set({ currentIndex: index });
       }
     }
@@ -324,7 +321,6 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         useSoundStore.getState().seekTo(0);
         useSoundStore.getState().play();
       } else {
-        useSoundStore.getState().stop();
         set({ currentIndex: index });
       }
     }
