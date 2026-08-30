@@ -146,8 +146,12 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     const handlePlay = () => {
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
-        if (audio.networkState === 3 || audio.error) {
-          audio.load();
+        // Proxied YouTube streams die after a few seconds of pause.
+        // We MUST reload the stream to reconnect. Save position first.
+        const savedTime = audio.currentTime;
+        audio.load();
+        if (savedTime > 0 && isFinite(savedTime)) {
+          audio.currentTime = savedTime;
         }
         audio.play().catch(() => {
           /* ignore */
