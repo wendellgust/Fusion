@@ -112,88 +112,101 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       return;
     }
 
-    try {
-      navigator.mediaSession.setActionHandler('play', () => {
-        const audio = document.querySelector('audio');
-        if (audio && audio.paused) {
-          // If paused for a long time, the stream might have stalled or aborted.
-          // Forcing load() resets the decoder and reconnects to the HTTP stream properly.
-          if (audio.networkState === 3 || audio.error) {
-            audio.load();
+    const registerHandler = (
+      action: MediaSessionAction,
+      handler: MediaSessionActionHandler | null,
+    ) => {
+      try {
+        navigator.mediaSession.setActionHandler(action, handler);
+      } catch {
+        console.warn(
+          `[MediaSession] action ${action} not supported or failed to register`,
+        );
+      }
+    };
+
+    registerHandler('play', () => {
+      const audio = document.querySelector('audio');
+      if (audio && audio.paused) {
+        if (audio.networkState === 3 || audio.error) {
+          audio.load();
+        }
+        audio.play().catch(() => {});
+      }
+      useSoundStore.getState().play();
+    });
+
+    registerHandler('pause', () => {
+      const audio = document.querySelector('audio');
+      if (audio && !audio.paused) {
+        audio.pause();
+      }
+      useSoundStore.getState().pause();
+    });
+
+    registerHandler('previoustrack', () => {
+      const audio = document.querySelector('audio');
+      if (audio) {
+        const queue = useQueueStore.getState();
+        const prevItem = queue.items[queue.currentIndex - 1];
+        let targetUrl = '/api/silent.mp3';
+
+        if (prevItem) {
+          const cached = streamResolutionCache.get(prevItem.id);
+          if (isCacheValid(cached)) {
+            targetUrl = cached!.audioSource!.url;
           }
-          audio.play().catch(() => {});
         }
-        useSoundStore.getState().play();
-      });
-      navigator.mediaSession.setActionHandler('pause', () => {
-        const audio = document.querySelector('audio');
-        if (audio && !audio.paused) {
-          audio.pause();
+
+        audio.loop = targetUrl.includes('/api/silent.mp3');
+        audio.src = targetUrl;
+        audio.play().catch(() => {});
+      }
+      useQueueStore.getState().goToPrevious();
+    });
+
+    registerHandler('nexttrack', () => {
+      const audio = document.querySelector('audio');
+      if (audio) {
+        const queue = useQueueStore.getState();
+        const nextItem = queue.items[queue.currentIndex + 1];
+        let targetUrl = '/api/silent.mp3';
+
+        if (nextItem) {
+          const cached = streamResolutionCache.get(nextItem.id);
+          if (isCacheValid(cached)) {
+            targetUrl = cached!.audioSource!.url;
+          }
         }
-        useSoundStore.getState().pause();
-      });
-      navigator.mediaSession.setActionHandler('previoustrack', () => {
+
+        audio.loop = targetUrl.includes('/api/silent.mp3');
+        audio.src = targetUrl;
+        audio.play().catch(() => {});
+      }
+      useQueueStore.getState().goToNext();
+    });
+
+    registerHandler('seekto', (details: MediaSessionActionDetails) => {
+      if (details.seekTime !== undefined) {
         const audio = document.querySelector('audio');
         if (audio) {
-          const queue = useQueueStore.getState();
-          const prevItem = queue.items[queue.currentIndex - 1];
-          let targetUrl = '/api/silent.mp3';
-
-          if (prevItem) {
-            const cached = streamResolutionCache.get(prevItem.id);
-            if (isCacheValid(cached)) {
-              targetUrl = cached!.audioSource.url;
-            }
-          }
-
-          audio.loop = targetUrl.includes('/api/silent.mp3');
-          audio.src = targetUrl;
-          audio.play().catch(() => {});
+          audio.currentTime = details.seekTime;
         }
-        useQueueStore.getState().goToPrevious();
-      });
-      navigator.mediaSession.setActionHandler('nexttrack', () => {
-        const audio = document.querySelector('audio');
-        if (audio) {
-          const queue = useQueueStore.getState();
-          const nextItem = queue.items[queue.currentIndex + 1];
-          let targetUrl = '/api/silent.mp3';
+        useSoundStore.getState().seekTo(details.seekTime);
+      }
+    });
 
-          if (nextItem) {
-            const cached = streamResolutionCache.get(nextItem.id);
-            if (isCacheValid(cached)) {
-              targetUrl = cached!.audioSource.url;
-            }
-          }
+    // Explicitly disable seekbackward/seekforward handlers so iOS renders Previous/Next track buttons
+    registerHandler('seekbackward', null);
+    registerHandler('seekforward', null);
 
-          audio.loop = targetUrl.includes('/api/silent.mp3');
-          audio.src = targetUrl;
-          audio.play().catch(() => {});
-        }
-        useQueueStore.getState().goToNext();
-      });
-      navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (details.seekTime !== undefined) {
-          const audio = document.querySelector('audio');
-          if (audio) {
-            audio.currentTime = details.seekTime;
-          }
-          useSoundStore.getState().seekTo(details.seekTime);
-        }
-      });
-      // Explicitly disable seekbackward/seekforward handlers so iOS renders Previous/Next track buttons
-      navigator.mediaSession.setActionHandler('seekbackward', null);
-      navigator.mediaSession.setActionHandler('seekforward', null);
-      navigator.mediaSession.setActionHandler('stop', () => {
-        const audio = document.querySelector('audio');
-        if (audio) {
-          audio.pause();
-        }
-        useSoundStore.getState().stop();
-      });
-    } catch {
-      /* ignore unsupported actions */
-    }
+    registerHandler('stop', () => {
+      const audio = document.querySelector('audio');
+      if (audio) {
+        audio.pause();
+      }
+      useSoundStore.getState().stop();
+    });
   }, []);
 
   // Sync playback state and metadata to lockscreen
