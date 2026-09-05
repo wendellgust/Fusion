@@ -73,6 +73,22 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       } else {
         isUnlocked = true;
       }
+
+      if (isIOSDevice()) {
+        const silentKeeper = document.getElementById(
+          'fusion-silent-keeper',
+        ) as HTMLAudioElement | null;
+        if (silentKeeper && silentKeeper.paused) {
+          const p = silentKeeper.play();
+          if (p && typeof p.then === 'function') {
+            p.then(() => {
+              if (useSoundStore.getState().status !== 'paused') {
+                silentKeeper.pause();
+              }
+            }).catch(() => {});
+          }
+        }
+      }
     };
 
     window.addEventListener('touchstart', unlockAudio, {
@@ -143,7 +159,33 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       }
     };
 
+    const startSilentKeeper = () => {
+      if (!isIOSDevice()) {
+        return;
+      }
+      const silentEl = document.getElementById(
+        'fusion-silent-keeper',
+      ) as HTMLAudioElement | null;
+      if (silentEl && silentEl.paused) {
+        silentEl.currentTime = 0;
+        silentEl.play().catch(() => {});
+      }
+    };
+
+    const stopSilentKeeper = () => {
+      if (!isIOSDevice()) {
+        return;
+      }
+      const silentEl = document.getElementById(
+        'fusion-silent-keeper',
+      ) as HTMLAudioElement | null;
+      if (silentEl && !silentEl.paused) {
+        silentEl.pause();
+      }
+    };
+
     const handlePlay = () => {
+      stopSilentKeeper();
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
         // Direct resume: keep the existing buffered media and audio session active.
@@ -184,6 +226,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       if (audio && !audio.paused) {
         audio.pause();
       }
+      startSilentKeeper();
       // Sync directly — React useEffect does NOT run when tab is backgrounded
       navigator.mediaSession.playbackState = 'paused';
       if (audio) {
@@ -193,59 +236,77 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     };
 
     const handlePrevious = () => {
+      stopSilentKeeper();
       const audio = document.querySelector('audio');
-      if (audio) {
-        const queue = useQueueStore.getState();
-        const prevIndex =
-          queue.currentIndex > 0
-            ? queue.currentIndex - 1
-            : queue.items.length > 0
-              ? queue.items.length - 1
-              : 0;
-        const prevItem = queue.items[prevIndex];
-        let targetUrl = '/api/silent.mp3';
+      const queue = useQueueStore.getState();
 
-        if (prevItem) {
-          const cached = streamResolutionCache.get(prevItem.id);
-          if (isCacheValid(cached)) {
-            targetUrl = cached!.audioSource!.url;
-          }
+      if (queue.items.length <= 1 || (audio && audio.currentTime > 3)) {
+        if (audio) {
+          audio.currentTime = 0;
+          audio.play().catch(() => {});
         }
-
-        audio.loop = targetUrl.includes('/api/silent.mp3');
-        audio.src = targetUrl;
-        audio.play().catch(() => {
-          /* ignore */
-        });
+        useSoundStore.getState().seekTo(0);
+        useSoundStore.getState().play();
+        return;
       }
+
+      const prevIndex =
+        queue.currentIndex > 0
+          ? queue.currentIndex - 1
+          : queue.items.length - 1;
+      const prevItem = queue.items[prevIndex];
+
+      if (audio && prevItem) {
+        const cached = streamResolutionCache.get(prevItem.id);
+        if (isCacheValid(cached)) {
+          audio.loop = false;
+          audio.src = cached!.audioSource!.url;
+          audio.play().catch(() => {});
+        } else {
+          audio.loop = true;
+          audio.src = '/api/silent.mp3';
+          audio.play().catch(() => {});
+        }
+      }
+
       navigator.mediaSession.playbackState = 'playing';
       useQueueStore.getState().goToPrevious();
     };
 
     const handleNext = () => {
+      stopSilentKeeper();
       const audio = document.querySelector('audio');
-      if (audio) {
-        const queue = useQueueStore.getState();
-        const nextIndex =
-          queue.currentIndex < queue.items.length - 1
-            ? queue.currentIndex + 1
-            : 0;
-        const nextItem = queue.items[nextIndex];
-        let targetUrl = '/api/silent.mp3';
+      const queue = useQueueStore.getState();
 
-        if (nextItem) {
-          const cached = streamResolutionCache.get(nextItem.id);
-          if (isCacheValid(cached)) {
-            targetUrl = cached!.audioSource!.url;
-          }
+      if (queue.items.length <= 1) {
+        if (audio) {
+          audio.currentTime = 0;
+          audio.play().catch(() => {});
         }
-
-        audio.loop = targetUrl.includes('/api/silent.mp3');
-        audio.src = targetUrl;
-        audio.play().catch(() => {
-          /* ignore */
-        });
+        useSoundStore.getState().seekTo(0);
+        useSoundStore.getState().play();
+        return;
       }
+
+      const nextIndex =
+        queue.currentIndex < queue.items.length - 1
+          ? queue.currentIndex + 1
+          : 0;
+      const nextItem = queue.items[nextIndex];
+
+      if (audio && nextItem) {
+        const cached = streamResolutionCache.get(nextItem.id);
+        if (isCacheValid(cached)) {
+          audio.loop = false;
+          audio.src = cached!.audioSource!.url;
+          audio.play().catch(() => {});
+        } else {
+          audio.loop = true;
+          audio.src = '/api/silent.mp3';
+          audio.play().catch(() => {});
+        }
+      }
+
       navigator.mediaSession.playbackState = 'playing';
       useQueueStore.getState().goToNext();
     };
@@ -261,18 +322,22 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('seekbackward', handlePrevious);
     registerHandler('seekforward', handleNext);
 
-    registerHandler('seekto', (details: MediaSessionActionDetails) => {
-      if (details.seekTime !== undefined) {
-        const audio = document.querySelector('audio');
-        if (audio) {
-          audio.currentTime = details.seekTime;
-          syncPositionState(audio, audio.paused ? 0 : 1);
+    // Do NOT register seekto on iOS: registering seekto forces iOS into time-seek (+10s/-10s) mode instead of track mode
+    if (!isIOSDevice()) {
+      registerHandler('seekto', (details: MediaSessionActionDetails) => {
+        if (details.seekTime !== undefined) {
+          const audio = document.querySelector('audio');
+          if (audio) {
+            audio.currentTime = details.seekTime;
+            syncPositionState(audio, audio.paused ? 0 : 1);
+          }
+          useSoundStore.getState().seekTo(details.seekTime);
         }
-        useSoundStore.getState().seekTo(details.seekTime);
-      }
-    });
+      });
+    }
 
     registerHandler('stop', () => {
+      stopSilentKeeper();
       const audio = document.querySelector('audio');
       if (audio) {
         audio.pause();
@@ -295,6 +360,22 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
           : status === 'paused'
             ? 'paused'
             : 'none';
+    }
+
+    if (isIOSDevice()) {
+      const silentEl = document.getElementById(
+        'fusion-silent-keeper',
+      ) as HTMLAudioElement | null;
+      if (status === 'paused') {
+        if (silentEl && silentEl.paused) {
+          silentEl.currentTime = 0;
+          silentEl.play().catch(() => {});
+        }
+      } else if (status === 'playing') {
+        if (silentEl && !silentEl.paused) {
+          silentEl.pause();
+        }
+      }
     }
 
     const currentItem = useQueueStore.getState().getCurrentItem();
@@ -575,6 +656,24 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         <Volume value={volumePercent} />
         <VisualizerAnalyser />
       </Sound>
+      {isIOSDevice() && (
+        <audio
+          id="fusion-silent-keeper"
+          playsInline
+          loop
+          preload="auto"
+          src="/api/silent.mp3"
+          style={{
+            position: 'fixed',
+            top: '-9999px',
+            left: '-9999px',
+            width: '1px',
+            height: '1px',
+            opacity: 0.001,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {children}
     </>
   );
