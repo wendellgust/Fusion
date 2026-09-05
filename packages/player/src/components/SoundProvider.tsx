@@ -7,9 +7,7 @@ import { useTranslation } from '@nuclearplayer/i18n';
 import { useCoreSetting } from '../hooks/useCoreSetting';
 import {
   handleCurrentTrackFailure,
-  isCacheValid,
   reResolveCurrentTrack,
-  streamResolutionCache,
 } from '../hooks/useStreamResolution';
 import { eventBus } from '../services/eventBus';
 import { Logger } from '../services/logger';
@@ -159,61 +157,14 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       }
     };
 
-    const startSilentKeeper = () => {
-      if (!isIOSDevice()) {
-        return;
-      }
-      const silentEl = document.getElementById(
-        'fusion-silent-keeper',
-      ) as HTMLAudioElement | null;
-      if (silentEl && silentEl.paused) {
-        silentEl.currentTime = 0;
-        silentEl.play().catch(() => {});
-      }
-    };
-
-    const stopSilentKeeper = () => {
-      if (!isIOSDevice()) {
-        return;
-      }
-      const silentEl = document.getElementById(
-        'fusion-silent-keeper',
-      ) as HTMLAudioElement | null;
-      if (silentEl && !silentEl.paused) {
-        silentEl.pause();
-      }
-    };
-
     const handlePlay = () => {
-      stopSilentKeeper();
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
-        // Direct resume: keep the existing buffered media and audio session active.
-        const playPromise = audio.play();
-        if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch((err) => {
-            console.warn(
-              '[MediaSession] Direct play failed, retrying with reload:',
-              err,
-            );
-            const savedTime = audio.currentTime;
-            audio.load();
-            const onCanPlay = () => {
-              audio.removeEventListener('canplay', onCanPlay);
-              if (savedTime > 0 && isFinite(savedTime)) {
-                try {
-                  audio.currentTime = savedTime;
-                } catch {
-                  /* ignore */
-                }
-              }
-              audio.play().catch(() => {});
-            };
-            audio.addEventListener('canplay', onCanPlay);
-          });
-        }
+        audio.play().catch((err) => {
+          console.warn('[MediaSession] audio.play() caught:', err);
+          useSoundStore.getState().play();
+        });
       }
-      // Sync directly — React useEffect does NOT run when tab is backgrounded
       navigator.mediaSession.playbackState = 'playing';
       if (audio) {
         syncPositionState(audio, 1);
@@ -226,8 +177,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       if (audio && !audio.paused) {
         audio.pause();
       }
-      startSilentKeeper();
-      // Sync directly — React useEffect does NOT run when tab is backgrounded
       navigator.mediaSession.playbackState = 'paused';
       if (audio) {
         syncPositionState(audio, 0);
@@ -236,78 +185,30 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     };
 
     const handlePrevious = () => {
-      stopSilentKeeper();
       const audio = document.querySelector('audio');
-      const queue = useQueueStore.getState();
-
-      if (queue.items.length <= 1 || (audio && audio.currentTime > 3)) {
-        if (audio) {
+      if (audio) {
+        audio.loop = false;
+        if (audio.currentTime > 3) {
           audio.currentTime = 0;
-          audio.play().catch(() => {});
-        }
-        useSoundStore.getState().seekTo(0);
-        useSoundStore.getState().play();
-        return;
-      }
-
-      const prevIndex =
-        queue.currentIndex > 0
-          ? queue.currentIndex - 1
-          : queue.items.length - 1;
-      const prevItem = queue.items[prevIndex];
-
-      if (audio && prevItem) {
-        const cached = streamResolutionCache.get(prevItem.id);
-        if (isCacheValid(cached)) {
-          audio.loop = false;
-          audio.src = cached!.audioSource!.url;
-          audio.play().catch(() => {});
-        } else {
-          audio.loop = true;
-          audio.src = '/api/silent.mp3';
-          audio.play().catch(() => {});
+          useSoundStore.getState().seekTo(0);
+          useSoundStore.getState().play();
+          return;
         }
       }
 
       navigator.mediaSession.playbackState = 'playing';
+      useSoundStore.getState().play();
       useQueueStore.getState().goToPrevious();
     };
 
     const handleNext = () => {
-      stopSilentKeeper();
       const audio = document.querySelector('audio');
-      const queue = useQueueStore.getState();
-
-      if (queue.items.length <= 1) {
-        if (audio) {
-          audio.currentTime = 0;
-          audio.play().catch(() => {});
-        }
-        useSoundStore.getState().seekTo(0);
-        useSoundStore.getState().play();
-        return;
-      }
-
-      const nextIndex =
-        queue.currentIndex < queue.items.length - 1
-          ? queue.currentIndex + 1
-          : 0;
-      const nextItem = queue.items[nextIndex];
-
-      if (audio && nextItem) {
-        const cached = streamResolutionCache.get(nextItem.id);
-        if (isCacheValid(cached)) {
-          audio.loop = false;
-          audio.src = cached!.audioSource!.url;
-          audio.play().catch(() => {});
-        } else {
-          audio.loop = true;
-          audio.src = '/api/silent.mp3';
-          audio.play().catch(() => {});
-        }
+      if (audio) {
+        audio.loop = false;
       }
 
       navigator.mediaSession.playbackState = 'playing';
+      useSoundStore.getState().play();
       useQueueStore.getState().goToNext();
     };
 
@@ -316,28 +217,15 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('previoustrack', handlePrevious);
     registerHandler('nexttrack', handleNext);
 
-    // Map seekbackward and seekforward to previous and next track.
-    // iOS Safari typically defaults to showing 10s/15s skip buttons on lockscreen/Control Center.
-    // Mapping them to handlePrevious and handleNext ensures that clicking them skips entire tracks as requested.
-    registerHandler('seekbackward', handlePrevious);
-    registerHandler('seekforward', handleNext);
-
-    // Do NOT register seekto on iOS: registering seekto forces iOS into time-seek (+10s/-10s) mode instead of track mode
-    if (!isIOSDevice()) {
-      registerHandler('seekto', (details: MediaSessionActionDetails) => {
-        if (details.seekTime !== undefined) {
-          const audio = document.querySelector('audio');
-          if (audio) {
-            audio.currentTime = details.seekTime;
-            syncPositionState(audio, audio.paused ? 0 : 1);
-          }
-          useSoundStore.getState().seekTo(details.seekTime);
-        }
-      });
-    }
+    // CRITICAL FOR IOS:
+    // If seekbackward or seekforward handlers are registered, iOS MPRemoteCommandCenter
+    // switches into podcast scrubbing mode and displays "+10s" / "-10s" buttons instead of song buttons.
+    // Explicitly unregistering them (null) forces iOS to display the Next Track (|<<) and Previous Track (>>|) buttons.
+    registerHandler('seekbackward', null);
+    registerHandler('seekforward', null);
+    registerHandler('seekto', null);
 
     registerHandler('stop', () => {
-      stopSilentKeeper();
       const audio = document.querySelector('audio');
       if (audio) {
         audio.pause();
@@ -360,22 +248,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
           : status === 'paused'
             ? 'paused'
             : 'none';
-    }
-
-    if (isIOSDevice()) {
-      const silentEl = document.getElementById(
-        'fusion-silent-keeper',
-      ) as HTMLAudioElement | null;
-      if (status === 'paused') {
-        if (silentEl && silentEl.paused) {
-          silentEl.currentTime = 0;
-          silentEl.play().catch(() => {});
-        }
-      } else if (status === 'playing') {
-        if (silentEl && !silentEl.paused) {
-          silentEl.pause();
-        }
-      }
     }
 
     const currentItem = useQueueStore.getState().getCurrentItem();
@@ -428,11 +300,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   const handleTimeUpdate = useCallback(
     ({ position, duration }: { position: number; duration: number }) => {
       const currentSrc = useSoundStore.getState().src?.url;
-      if (
-        !currentSrc ||
-        currentSrc.includes('/api/silent.mp3') ||
-        currentSrc.startsWith('data:audio')
-      ) {
+      if (!currentSrc || currentSrc.startsWith('data:audio')) {
         return;
       }
       useSoundStore.getState().updatePlayback(position, duration);
@@ -470,18 +338,8 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
   const handleEnd = useCallback(() => {
     const currentSrc = useSoundStore.getState().src?.url;
-    if (
-      !currentSrc ||
-      currentSrc.includes('/api/silent.mp3') ||
-      currentSrc.startsWith('data:audio')
-    ) {
+    if (!currentSrc || currentSrc.startsWith('data:audio')) {
       return;
-    }
-    const audio = document.querySelector('audio');
-    if (audio) {
-      audio.loop = true;
-      audio.src = '/api/silent.mp3';
-      audio.play().catch(() => {});
     }
     const currentItem = useQueueStore.getState().getCurrentItem();
     if (currentItem) {
@@ -497,11 +355,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
   const handleCanPlay = useCallback(() => {
     const currentSrc = useSoundStore.getState().src?.url;
-    if (
-      !currentSrc ||
-      currentSrc.includes('/api/silent.mp3') ||
-      currentSrc.startsWith('data:audio')
-    ) {
+    if (!currentSrc || currentSrc.startsWith('data:audio')) {
       return;
     }
     if (pendingSeekRef.current !== null) {
@@ -523,11 +377,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   const handleError = useCallback(
     (error: Error) => {
       const currentSrc = useSoundStore.getState().src?.url;
-      if (
-        !currentSrc ||
-        currentSrc.includes('/api/silent.mp3') ||
-        currentSrc.startsWith('data:audio')
-      ) {
+      if (!currentSrc || currentSrc.startsWith('data:audio')) {
         return;
       }
       if (error.message === 'stream:expired') {
@@ -656,24 +506,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         <Volume value={volumePercent} />
         <VisualizerAnalyser />
       </Sound>
-      {isIOSDevice() && (
-        <audio
-          id="fusion-silent-keeper"
-          playsInline
-          loop
-          preload="auto"
-          src="/api/silent.mp3"
-          style={{
-            position: 'fixed',
-            top: '-9999px',
-            left: '-9999px',
-            width: '1px',
-            height: '1px',
-            opacity: 0.001,
-            pointerEvents: 'none',
-          }}
-        />
-      )}
       {children}
     </>
   );

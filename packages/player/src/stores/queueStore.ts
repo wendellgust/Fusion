@@ -264,19 +264,39 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
   goToNext: withPersistence(() => {
     const state = get();
+    if (state.items.length === 0) {
+      return;
+    }
     const nextIndex = getDirectionalIndex(state, 'forward');
     if (nextIndex !== state.currentIndex) {
       set({ currentIndex: nextIndex });
       Logger.queue.debug(`Moved to next track (index ${nextIndex})`);
+    } else if (state.items.length > 1) {
+      set({ currentIndex: 0 });
+      Logger.queue.debug('Wrapped around to first track (index 0)');
+    } else {
+      useSoundStore.getState().seekTo(0);
+      useSoundStore.getState().play();
     }
   }),
 
   goToPrevious: withPersistence(() => {
     const state = get();
+    if (state.items.length === 0) {
+      return;
+    }
     const previousIndex = getDirectionalIndex(state, 'backward');
     if (previousIndex !== state.currentIndex) {
       set({ currentIndex: previousIndex });
       Logger.queue.debug(`Moved to previous track (index ${previousIndex})`);
+    } else if (state.items.length > 1) {
+      set({ currentIndex: state.items.length - 1 });
+      Logger.queue.debug(
+        `Wrapped around to last track (index ${state.items.length - 1})`,
+      );
+    } else {
+      useSoundStore.getState().seekTo(0);
+      useSoundStore.getState().play();
     }
   }),
 
