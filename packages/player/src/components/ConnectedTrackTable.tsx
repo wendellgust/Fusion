@@ -9,6 +9,7 @@ import {
 
 import { useQueueActions } from '../hooks/useQueueActions';
 import { useTrackActions } from '../hooks/useTrackActions';
+import { useSoundStore } from '../stores/soundStore';
 import { ConnectedTrackContextMenu } from './ConnectedTrackContextMenu';
 
 type ConnectedTrackTableProps = Omit<
@@ -44,11 +45,11 @@ export const ConnectedTrackTable: FC<ConnectedTrackTableProps> = (props) => {
                 (t.title === track.title &&
                   t.artists?.[0]?.name === track.artists?.[0]?.name),
             );
+            const targetIndex = trackIndex >= 0 ? trackIndex : 0;
             queueActions.clearQueue();
             queueActions.addToQueue(restProps.tracks);
-            if (trackIndex > 0) {
-              queueActions.goToIndex(trackIndex);
-            }
+            queueActions.goToIndex(targetIndex);
+            useSoundStore.getState().play();
           } else {
             trackActions.playNow(track);
           }

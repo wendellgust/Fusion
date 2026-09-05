@@ -160,10 +160,23 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     const handlePlay = () => {
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
-        audio.play().catch((err) => {
-          console.warn('[MediaSession] audio.play() caught:', err);
-          useSoundStore.getState().play();
-        });
+        // Proxied YouTube streams die after a few seconds of pause.
+        // We MUST reload the stream to reconnect. Save position first.
+        const savedTime = audio.currentTime;
+        audio.load();
+        if (savedTime > 0 && isFinite(savedTime)) {
+          audio.currentTime = savedTime;
+        }
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch((err) => {
+            console.warn(
+              '[MediaSession] audio.play() reload caught, re-resolving:',
+              err,
+            );
+            void reResolveCurrentTrack(t);
+          });
+        }
       }
       navigator.mediaSession.playbackState = 'playing';
       if (audio) {
@@ -217,13 +230,23 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('previoustrack', handlePrevious);
     registerHandler('nexttrack', handleNext);
 
-    // CRITICAL FOR IOS:
-    // If seekbackward or seekforward handlers are registered, iOS MPRemoteCommandCenter
-    // switches into podcast scrubbing mode and displays "+10s" / "-10s" buttons instead of song buttons.
-    // Explicitly unregistering them (null) forces iOS to display the Next Track (|<<) and Previous Track (>>|) buttons.
-    registerHandler('seekbackward', null);
-    registerHandler('seekforward', null);
-    registerHandler('seekto', null);
+    // Map seekbackward and seekforward to song track skipping!
+    // On iOS Lock Screen, Safari defaults to displaying 10s/15s curved buttons.
+    // By intercepting seekforward and seekbackward here and routing them to handleNext and handlePrevious,
+    // tapping the 10s button will ALWAYS skip to the next complete song instead of seeking 10 seconds!
+    registerHandler('seekbackward', handlePrevious);
+    registerHandler('seekforward', handleNext);
+
+    registerHandler('seekto', (details: MediaSessionActionDetails) => {
+      if (details.seekTime !== undefined) {
+        const audio = document.querySelector('audio');
+        if (audio) {
+          audio.currentTime = details.seekTime;
+          syncPositionState(audio, audio.paused ? 0 : 1);
+        }
+        useSoundStore.getState().seekTo(details.seekTime);
+      }
+    });
 
     registerHandler('stop', () => {
       const audio = document.querySelector('audio');
