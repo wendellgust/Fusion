@@ -146,16 +146,30 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     const handlePlay = () => {
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
-        // Proxied YouTube streams die after a few seconds of pause.
-        // We MUST reload the stream to reconnect. Save position first.
-        const savedTime = audio.currentTime;
-        audio.load();
-        if (savedTime > 0 && isFinite(savedTime)) {
-          audio.currentTime = savedTime;
+        // Direct resume: keep the existing buffered media and audio session active.
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch((err) => {
+            console.warn(
+              '[MediaSession] Direct play failed, retrying with reload:',
+              err,
+            );
+            const savedTime = audio.currentTime;
+            audio.load();
+            const onCanPlay = () => {
+              audio.removeEventListener('canplay', onCanPlay);
+              if (savedTime > 0 && isFinite(savedTime)) {
+                try {
+                  audio.currentTime = savedTime;
+                } catch {
+                  /* ignore */
+                }
+              }
+              audio.play().catch(() => {});
+            };
+            audio.addEventListener('canplay', onCanPlay);
+          });
         }
-        audio.play().catch(() => {
-          /* ignore */
-        });
       }
       // Sync directly — React useEffect does NOT run when tab is backgrounded
       navigator.mediaSession.playbackState = 'playing';
@@ -182,7 +196,13 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       const audio = document.querySelector('audio');
       if (audio) {
         const queue = useQueueStore.getState();
-        const prevItem = queue.items[queue.currentIndex - 1];
+        const prevIndex =
+          queue.currentIndex > 0
+            ? queue.currentIndex - 1
+            : queue.items.length > 0
+              ? queue.items.length - 1
+              : 0;
+        const prevItem = queue.items[prevIndex];
         let targetUrl = '/api/silent.mp3';
 
         if (prevItem) {
@@ -206,7 +226,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       const audio = document.querySelector('audio');
       if (audio) {
         const queue = useQueueStore.getState();
-        const nextItem = queue.items[queue.currentIndex + 1];
+        const nextIndex =
+          queue.currentIndex < queue.items.length - 1
+            ? queue.currentIndex + 1
+            : 0;
+        const nextItem = queue.items[nextIndex];
         let targetUrl = '/api/silent.mp3';
 
         if (nextItem) {
@@ -231,10 +255,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('previoustrack', handlePrevious);
     registerHandler('nexttrack', handleNext);
 
-    // Setting these to null tells iOS "I don't support skip-10s" which forces it
-    // to show the previous/next track buttons instead.
-    registerHandler('seekbackward', null);
-    registerHandler('seekforward', null);
+    // Map seekbackward and seekforward to previous and next track.
+    // iOS Safari typically defaults to showing 10s/15s skip buttons on lockscreen/Control Center.
+    // Mapping them to handlePrevious and handleNext ensures that clicking them skips entire tracks as requested.
+    registerHandler('seekbackward', handlePrevious);
+    registerHandler('seekforward', handleNext);
 
     registerHandler('seekto', (details: MediaSessionActionDetails) => {
       if (details.seekTime !== undefined) {
