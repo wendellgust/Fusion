@@ -520,13 +520,8 @@ export const reResolveCurrentTrack = async (t: TFunction): Promise<void> => {
 
   streamResolutionCache.delete(currentItem.id);
 
-  const { stop, setSrc } = useSoundStore.getState();
-  const isPlaying = useSoundStore.getState().status === 'playing';
-  if (!isPlaying) {
-    stop();
-  } else {
-    setSrc(null);
-  }
+  const { setSrc, play } = useSoundStore.getState();
+  setSrc(null);
 
   activeMainController?.abort();
   activeMainController = new AbortController();
@@ -577,6 +572,7 @@ export const reResolveCurrentTrack = async (t: TFunction): Promise<void> => {
   });
 
   setSrc(audioSource);
+  play();
 };
 
 export const useStreamResolution = (): void => {

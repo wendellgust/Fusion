@@ -170,82 +170,46 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
     const handlePlay = () => {
       const audio = document.querySelector('audio');
+      const currentPos = audio?.currentTime ?? 0;
+      const pausedDuration =
+        lastPauseTimeRef.current > 0
+          ? Date.now() - lastPauseTimeRef.current
+          : 0;
+
+      lastPauseTimeRef.current = 0;
+
       if (audio && audio.paused) {
-        const currentPos = audio.currentTime;
-        const currentSrc = useSoundStore.getState().src?.url;
-
-        let hasBufferAhead = false;
-        try {
-          for (let i = 0; i < audio.buffered.length; i++) {
-            if (
-              audio.buffered.start(i) <= currentPos &&
-              audio.buffered.end(i) > currentPos + 0.5
-            ) {
-              hasBufferAhead = true;
-              break;
-            }
-          }
-        } catch {
-          // ignore
-        }
-
-        const pausedDuration =
-          lastPauseTimeRef.current > 0
-            ? Date.now() - lastPauseTimeRef.current
-            : 0;
-
-        // iOS terminates network sockets after ~25-30s in background
-        const needsReconnect =
+        // If paused for more than 20s or audio state dropped in background:
+        if (
           pausedDuration > 20000 ||
           audio.error !== null ||
           audio.networkState === 3 ||
-          audio.readyState < 2 ||
-          !hasBufferAhead;
-
-        if (needsReconnect && currentSrc) {
-          // Add a unique query param before url= so WebKit opens a fresh TCP socket
-          let freshUrl: string;
-          if (currentSrc.includes('/api/proxy-audio?')) {
-            freshUrl = currentSrc.replace(
-              '/api/proxy-audio?',
-              `/api/proxy-audio?_r=${Date.now()}&`,
-            );
-          } else if (currentSrc.includes('?')) {
-            freshUrl = `${currentSrc}&_r=${Date.now()}`;
-          } else {
-            freshUrl = `${currentSrc}?_r=${Date.now()}`;
+          audio.readyState < 2
+        ) {
+          if (currentPos > 1 && isFinite(currentPos)) {
+            pendingSeekRef.current = currentPos;
           }
-
-          audio.src = freshUrl;
-          audio.load();
-
-          if (currentPos > 0 && isFinite(currentPos)) {
-            const restoreTime = () => {
-              try {
-                audio.currentTime = currentPos;
-              } catch {
-                // ignore
-              }
-            };
-            audio.addEventListener('loadedmetadata', restoreTime, {
-              once: true,
-            });
-            audio.addEventListener('canplay', restoreTime, { once: true });
-          }
+          navigator.mediaSession.playbackState = 'playing';
+          void reResolveCurrentTrack(tRef.current);
+          return;
         }
-
-        lastPauseTimeRef.current = 0;
 
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
           playPromise.catch((err: Error) => {
-            if (err.name === 'AbortError') {
-              return;
+            console.warn(
+              '[MediaSession] audio.play() caught, re-resolving:',
+              err,
+            );
+            if (currentPos > 1 && isFinite(currentPos)) {
+              pendingSeekRef.current = currentPos;
             }
-            console.warn('[MediaSession] audio.play() caught:', err);
+            navigator.mediaSession.playbackState = 'playing';
+            void reResolveCurrentTrack(tRef.current);
           });
         }
       }
+
       navigator.mediaSession.playbackState = 'playing';
       if (audio) {
         syncPositionState(audio, 1);
@@ -506,7 +470,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       if (!currentSrc || currentSrc.startsWith('data:audio')) {
         return;
       }
-      if (error.message === 'stream:expired') {
+      if (
+        error.message === 'stream:expired' ||
+        audioElement?.error !== null ||
+        (status === 'playing' && audioElement?.networkState === 3)
+      ) {
         const savedTime = audioElement?.currentTime ?? 0;
         pendingSeekRef.current = savedTime > 1 ? savedTime : null;
         void reResolveCurrentTrack(t);
