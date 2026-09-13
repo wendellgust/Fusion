@@ -181,12 +181,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch((err) => {
-            console.warn(
-              '[MediaSession] audio.play() caught, re-resolving:',
-              err,
-            );
-            void reResolveCurrentTrack(tRef.current);
+          playPromise.catch((err: Error) => {
+            if (err.name === 'AbortError') {
+              return;
+            }
+            console.warn('[MediaSession] audio.play() caught:', err);
           });
         }
       }
@@ -255,8 +254,9 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('pause', handlePause);
     registerHandler('previoustrack', handlePrevious);
     registerHandler('nexttrack', handleNext);
-    registerHandler('seekbackward', null);
-    registerHandler('seekforward', null);
+    // Route seek buttons to track navigation so whether iOS displays +/-10s or track controls, whole songs are skipped
+    registerHandler('seekbackward', handlePrevious);
+    registerHandler('seekforward', handleNext);
     registerHandler('seekto', null);
 
     registerHandler('stop', () => {
@@ -268,91 +268,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       useSoundStore.getState().stop();
     });
   }, []);
-
-  // Assert track-skip shape (>>| and |<<) on audio events
-  const assertTrackControls = useCallback(() => {
-    if (typeof window === 'undefined' || !('mediaSession' in navigator)) {
-      return;
-    }
-
-    const ms = navigator.mediaSession;
-    try {
-      const handlePrevious = () => {
-        const audio = document.querySelector('audio');
-        if (audio) {
-          audio.loop = false;
-        }
-
-        const queue = useQueueStore.getState();
-        if (queue.items.length <= 1) {
-          const favTracks = useFavoritesStore
-            .getState()
-            .tracks.map((e: { ref: Track }) => e.ref);
-          if (favTracks.length > 0) {
-            queue.addToQueue(favTracks);
-          }
-        }
-
-        ms.playbackState = 'playing';
-        useSoundStore.getState().play();
-        useQueueStore.getState().goToPrevious();
-      };
-
-      const handleNext = () => {
-        const audio = document.querySelector('audio');
-        if (audio) {
-          audio.loop = false;
-        }
-
-        const queue = useQueueStore.getState();
-        if (queue.items.length <= 1) {
-          const favTracks = useFavoritesStore
-            .getState()
-            .tracks.map((e: { ref: Track }) => e.ref);
-          if (favTracks.length > 0) {
-            queue.addToQueue(favTracks);
-          }
-        }
-
-        ms.playbackState = 'playing';
-        useSoundStore.getState().play();
-        useQueueStore.getState().goToNext();
-      };
-
-      ms.setActionHandler('previoustrack', handlePrevious);
-      ms.setActionHandler('nexttrack', handleNext);
-      ms.setActionHandler('seekbackward', null);
-      ms.setActionHandler('seekforward', null);
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // Hook into audioElement events when playback begins
-  useEffect(() => {
-    if (!audioElement) {
-      return;
-    }
-
-    const onMediaEvent = () => {
-      assertTrackControls();
-    };
-
-    audioElement.addEventListener('play', onMediaEvent);
-    audioElement.addEventListener('playing', onMediaEvent);
-
-    return () => {
-      audioElement.removeEventListener('play', onMediaEvent);
-      audioElement.removeEventListener('playing', onMediaEvent);
-    };
-  }, [audioElement, assertTrackControls]);
-
-  // Assert track controls when track source changes
-  useEffect(() => {
-    if (src) {
-      assertTrackControls();
-    }
-  }, [src, assertTrackControls]);
 
   // Sync playback state and metadata to lockscreen
   useEffect(() => {
