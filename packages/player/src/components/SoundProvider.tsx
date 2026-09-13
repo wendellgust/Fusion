@@ -160,10 +160,18 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     const handlePlay = () => {
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
+        const currentPos = audio.currentTime;
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
           playPromise.catch((err: Error) => {
-            console.warn('[MediaSession] audio.play() caught:', err);
+            console.warn(
+              '[MediaSession] audio.play() caught, recovering stream:',
+              err,
+            );
+            if (currentPos > 1 && isFinite(currentPos)) {
+              pendingSeekRef.current = currentPos;
+            }
+            void reResolveCurrentTrack(tRef.current);
           });
         }
       }

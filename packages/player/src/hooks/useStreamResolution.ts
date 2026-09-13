@@ -528,19 +528,44 @@ export const reResolveCurrentTrack = async (t: TFunction): Promise<void> => {
     .getState()
     .updateItemState(currentItem.id, { status: 'loading', error: undefined });
 
-  let result = await resolveTrackAudioSource(currentItem, signal);
+  // Clear cached streams on existing candidates so streamingHost fetches a fresh stream
+  const freshCandidates = (currentItem.track.streamCandidates ?? []).map(
+    (c) => ({
+      ...c,
+      stream: undefined as unknown as typeof c.stream,
+      failed: false,
+    }),
+  );
+  updateItemCandidates(currentItem, freshCandidates);
+
+  const freshItem = {
+    ...currentItem,
+    track: { ...currentItem.track, streamCandidates: freshCandidates },
+  };
+
+  let result = await resolveTrackAudioSource(freshItem, signal);
   if (signal.aborted) {
     return;
   }
 
   if (!result) {
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    if (signal.aborted) {
-      return;
-    }
-    result = await resolveTrackAudioSource(currentItem, signal);
-    if (signal.aborted) {
-      return;
+    // If no candidates existed or resolution failed, re-resolve candidates from scratch
+    const freshCandidatesFromTrack = await resolveCandidates({
+      ...currentItem.track,
+      streamCandidates: undefined,
+    });
+    if (freshCandidatesFromTrack && freshCandidatesFromTrack.length > 0) {
+      updateItemCandidates(currentItem, freshCandidatesFromTrack);
+      result = await resolveTrackAudioSource(
+        {
+          ...currentItem,
+          track: {
+            ...currentItem.track,
+            streamCandidates: freshCandidatesFromTrack,
+          },
+        },
+        signal,
+      );
     }
   }
 
@@ -550,8 +575,15 @@ export const reResolveCurrentTrack = async (t: TFunction): Promise<void> => {
     return;
   }
 
+  // Ensure fresh URL with cache-buster so iOS WebKit and useAudioLoader detect the source change
+  const sep = result.audioSource.url.includes('?') ? '&' : '?';
+  const reloadedAudioSource = {
+    ...result.audioSource,
+    url: `${result.audioSource.url}${sep}_cb=${Date.now()}`,
+  };
+
   const { setSrc, play } = useSoundStore.getState();
-  setSrc(result.audioSource);
+  setSrc(reloadedAudioSource);
   play();
 };
 
