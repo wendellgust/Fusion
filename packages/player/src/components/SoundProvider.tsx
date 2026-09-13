@@ -23,6 +23,8 @@ import { VisualizerAnalyser } from './VisualizerAnalyser';
 export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   const { src, status, seek } = useSoundStore();
   const { t } = useTranslation('streaming');
+  const tRef = useRef(t);
+  tRef.current = t;
   const [crossfadeMs] = useCoreSetting<number>('playback.crossfadeMs');
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(
     null,
@@ -159,7 +161,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
     const handlePlay = () => {
       const audio = document.querySelector('audio');
-      if (audio) {
+      if (audio && audio.paused) {
         const currentPos = audio.currentTime;
         const currentSrc = useSoundStore.getState().src?.url;
 
@@ -184,7 +186,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
               '[MediaSession] audio.play() caught, re-resolving:',
               err,
             );
-            void reResolveCurrentTrack(t);
+            void reResolveCurrentTrack(tRef.current);
           });
         }
       }
@@ -255,18 +257,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('nexttrack', handleNext);
     registerHandler('seekbackward', null);
     registerHandler('seekforward', null);
-
-    registerHandler('seekto', (details) => {
-      const audio = document.querySelector('audio');
-      if (
-        details.seekTime !== undefined &&
-        audio &&
-        isFinite(details.seekTime)
-      ) {
-        audio.currentTime = details.seekTime;
-        useSoundStore.getState().seekTo(details.seekTime);
-      }
-    });
+    registerHandler('seekto', null);
 
     registerHandler('stop', () => {
       const audio = document.querySelector('audio');
@@ -276,7 +267,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       navigator.mediaSession.playbackState = 'none';
       useSoundStore.getState().stop();
     });
-  }, [t]);
+  }, []);
 
   // Assert track-skip shape (>>| and |<<) on audio events
   const assertTrackControls = useCallback(() => {
@@ -356,23 +347,12 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     };
   }, [audioElement, assertTrackControls]);
 
-  // Periodic assertion ONLY while playing (NEVER when paused, to preserve background pause/resume!)
+  // Assert track controls when track source changes
   useEffect(() => {
-    if (
-      status !== 'playing' ||
-      typeof window === 'undefined' ||
-      !('mediaSession' in navigator)
-    ) {
-      return;
-    }
-
-    assertTrackControls();
-    const intervalId = setInterval(() => {
+    if (src) {
       assertTrackControls();
-    }, 3000);
-
-    return () => clearInterval(intervalId);
-  }, [status, assertTrackControls]);
+    }
+  }, [src, assertTrackControls]);
 
   // Sync playback state and metadata to lockscreen
   useEffect(() => {
@@ -434,11 +414,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         /* ignore invalid metadata */
       }
     }
-
-    if (status === 'playing') {
-      assertTrackControls();
-    }
-  }, [src, status, assertTrackControls]);
+  }, [src, status]);
 
   const handleTimeUpdate = useCallback(
     ({ position, duration }: { position: number; duration: number }) => {
