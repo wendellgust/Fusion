@@ -520,8 +520,6 @@ export const reResolveCurrentTrack = async (t: TFunction): Promise<void> => {
 
   streamResolutionCache.delete(currentItem.id);
 
-  const { setSrc, play } = useSoundStore.getState();
-
   activeMainController?.abort();
   activeMainController = new AbortController();
   const { signal } = activeMainController;
@@ -530,47 +528,30 @@ export const reResolveCurrentTrack = async (t: TFunction): Promise<void> => {
     .getState()
     .updateItemState(currentItem.id, { status: 'loading', error: undefined });
 
-  // Clear cached stream URLs so resolveStreamForCandidate fetches fresh signed URLs
-  const freshCandidates = (currentItem.track.streamCandidates ?? []).map(
-    (c) => ({
-      ...c,
-      stream: undefined as unknown as typeof c.stream,
-      failed: false,
-    }),
-  );
-  updateItemCandidates(currentItem, freshCandidates);
-
-  const freshItem = {
-    ...currentItem,
-    track: { ...currentItem.track, streamCandidates: freshCandidates },
-  };
-
-  const resolvedCandidate = await resolveStreamWithFallback(
-    freshCandidates,
-    freshItem,
-    signal,
-  );
+  let result = await resolveTrackAudioSource(currentItem, signal);
   if (signal.aborted) {
     return;
   }
-  if (!resolvedCandidate?.stream) {
+
+  if (!result) {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    if (signal.aborted) {
+      return;
+    }
+    result = await resolveTrackAudioSource(currentItem, signal);
+    if (signal.aborted) {
+      return;
+    }
+  }
+
+  if (!result) {
     setItemError(currentItem.id, 'errors.allCandidatesFailed', t);
     handleCurrentTrackFailure(t);
     return;
   }
 
-  const audioSource = await buildAudioSource(resolvedCandidate);
-  if (signal.aborted) {
-    return;
-  }
-
-  streamResolutionCache.set(currentItem.id, {
-    audioSource,
-    candidate: resolvedCandidate,
-    resolvedAt: Date.now(),
-  });
-
-  setSrc(audioSource);
+  const { setSrc, play } = useSoundStore.getState();
+  setSrc(result.audioSource);
   play();
 };
 
