@@ -122,8 +122,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     }
   }, [crossfadeMs]);
 
-  // Register MediaSession action handlers permanently so iOS never loses background callback references
-  useEffect(() => {
+  const syncMediaSessionHandlers = useCallback(() => {
     if (typeof window === 'undefined' || !('mediaSession' in navigator)) {
       return;
     }
@@ -135,9 +134,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       try {
         navigator.mediaSession.setActionHandler(action, handler);
       } catch {
-        console.warn(
-          `[MediaSession] action ${action} not supported or failed to register`,
-        );
+        // Action not supported or failed to register
       }
     };
 
@@ -258,7 +255,18 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     // iOS Lock Screen and Control Center to show Next Track (>>|) and Previous Track (|<<)!
     registerHandler('seekbackward', null);
     registerHandler('seekforward', null);
-    registerHandler('seekto', null);
+
+    registerHandler('seekto', (details) => {
+      const audio = document.querySelector('audio');
+      if (
+        details.seekTime !== undefined &&
+        audio &&
+        isFinite(details.seekTime)
+      ) {
+        audio.currentTime = details.seekTime;
+        useSoundStore.getState().seekTo(details.seekTime);
+      }
+    });
 
     registerHandler('stop', () => {
       const audio = document.querySelector('audio');
@@ -268,7 +276,48 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       navigator.mediaSession.playbackState = 'none';
       useSoundStore.getState().stop();
     });
-  }, []);
+  }, [t]);
+
+  // Initial registration
+  useEffect(() => {
+    syncMediaSessionHandlers();
+  }, [syncMediaSessionHandlers]);
+
+  // Hook into audioElement events to continuously re-assert handlers when playback starts or changes
+  useEffect(() => {
+    if (!audioElement) {
+      return;
+    }
+
+    const onMediaEvent = () => {
+      syncMediaSessionHandlers();
+    };
+
+    audioElement.addEventListener('play', onMediaEvent);
+    audioElement.addEventListener('playing', onMediaEvent);
+    audioElement.addEventListener('canplay', onMediaEvent);
+    audioElement.addEventListener('loadedmetadata', onMediaEvent);
+
+    return () => {
+      audioElement.removeEventListener('play', onMediaEvent);
+      audioElement.removeEventListener('playing', onMediaEvent);
+      audioElement.removeEventListener('canplay', onMediaEvent);
+      audioElement.removeEventListener('loadedmetadata', onMediaEvent);
+    };
+  }, [audioElement, syncMediaSessionHandlers]);
+
+  // Periodic heartbeat every 2s to heal any WebKit GPU process reset
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      syncMediaSessionHandlers();
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [syncMediaSessionHandlers]);
 
   // Sync playback state and metadata to lockscreen
   useEffect(() => {
@@ -330,7 +379,9 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         /* ignore invalid metadata */
       }
     }
-  }, [src, status]);
+
+    syncMediaSessionHandlers();
+  }, [src, status, syncMediaSessionHandlers]);
 
   const handleTimeUpdate = useCallback(
     ({ position, duration }: { position: number; duration: number }) => {

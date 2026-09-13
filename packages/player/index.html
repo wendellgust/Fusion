@@ -12,6 +12,20 @@
          suspends the webapp when backgrounded, breaking MediaSession/lockscreen controls -->
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Fusion Player</title>
+    <script>
+      (function () {
+        function assertNowPlayingShape() {
+          try {
+            if (navigator.mediaSession && navigator.mediaSession.setActionHandler) {
+              navigator.mediaSession.setActionHandler('seekbackward', null);
+              navigator.mediaSession.setActionHandler('seekforward', null);
+            }
+          } catch (e) {}
+        }
+        assertNowPlayingShape();
+        setInterval(assertNowPlayingShape, 2000);
+      })();
+    </script>
 </head>
 
 <body>
