@@ -31,6 +31,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   );
   const pendingSeekRef = useRef<number | null>(null);
   const lastFailureTimeRef = useRef<number>(0);
+  const lastPauseTimeRef = useRef<number>(0);
   const setAnalyser = useVisualizerStore((state) => state.setAnalyser);
   const preload: HTMLAudioElement['preload'] = 'auto';
   const crossOrigin = 'anonymous' as const;
@@ -124,6 +125,12 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     }
   }, [crossfadeMs]);
 
+  useEffect(() => {
+    if (status === 'paused') {
+      lastPauseTimeRef.current = Date.now();
+    }
+  }, [status]);
+
   const syncPositionState = useCallback(
     (audio: HTMLAudioElement, rate: number) => {
       if (
@@ -182,33 +189,52 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
           // ignore
         }
 
-        const needsReload =
+        const pausedDuration =
+          lastPauseTimeRef.current > 0
+            ? Date.now() - lastPauseTimeRef.current
+            : 0;
+
+        // iOS terminates network sockets after ~25-30s in background
+        const needsReconnect =
+          pausedDuration > 20000 ||
           audio.error !== null ||
           audio.networkState === 3 ||
           audio.readyState < 2 ||
           !hasBufferAhead;
 
-        if (needsReload && currentSrc) {
-          audio.src = currentSrc;
-          if (currentPos > 0 && isFinite(currentPos)) {
-            try {
-              audio.currentTime = currentPos;
-            } catch {
-              // ignore
-            }
-            audio.addEventListener(
-              'loadedmetadata',
-              () => {
-                try {
-                  audio.currentTime = currentPos;
-                } catch {
-                  // ignore
-                }
-              },
-              { once: true },
+        if (needsReconnect && currentSrc) {
+          // Add a unique query param before url= so WebKit opens a fresh TCP socket
+          let freshUrl: string;
+          if (currentSrc.includes('/api/proxy-audio?')) {
+            freshUrl = currentSrc.replace(
+              '/api/proxy-audio?',
+              `/api/proxy-audio?_r=${Date.now()}&`,
             );
+          } else if (currentSrc.includes('?')) {
+            freshUrl = `${currentSrc}&_r=${Date.now()}`;
+          } else {
+            freshUrl = `${currentSrc}?_r=${Date.now()}`;
+          }
+
+          audio.src = freshUrl;
+          audio.load();
+
+          if (currentPos > 0 && isFinite(currentPos)) {
+            const restoreTime = () => {
+              try {
+                audio.currentTime = currentPos;
+              } catch {
+                // ignore
+              }
+            };
+            audio.addEventListener('loadedmetadata', restoreTime, {
+              once: true,
+            });
+            audio.addEventListener('canplay', restoreTime, { once: true });
           }
         }
+
+        lastPauseTimeRef.current = 0;
 
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
@@ -217,28 +243,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
               return;
             }
             console.warn('[MediaSession] audio.play() caught:', err);
-            if (currentSrc) {
-              audio.src = currentSrc;
-              if (currentPos > 0 && isFinite(currentPos)) {
-                try {
-                  audio.currentTime = currentPos;
-                } catch {
-                  // ignore
-                }
-                audio.addEventListener(
-                  'loadedmetadata',
-                  () => {
-                    try {
-                      audio.currentTime = currentPos;
-                    } catch {
-                      // ignore
-                    }
-                  },
-                  { once: true },
-                );
-              }
-              audio.play().catch(() => {});
-            }
           });
         }
       }
@@ -250,6 +254,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     };
 
     const handlePause = () => {
+      lastPauseTimeRef.current = Date.now();
       const audio = document.querySelector('audio');
       if (audio && !audio.paused) {
         audio.pause();
