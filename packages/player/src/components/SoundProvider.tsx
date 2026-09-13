@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { isIOSDevice, Sound, Volume } from '@nuclearplayer/hifi';
 import { useTranslation } from '@nuclearplayer/i18n';
+import type { Track } from '@nuclearplayer/model';
 
 import { useCoreSetting } from '../hooks/useCoreSetting';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../hooks/useStreamResolution';
 import { eventBus } from '../services/eventBus';
 import { Logger } from '../services/logger';
+import { useFavoritesStore } from '../stores/favoritesStore';
 import { useQueueStore } from '../stores/queueStore';
 import { useSoundStore } from '../stores/soundStore';
 import { useVisualizerStore } from '../stores/visualizerStore';
@@ -162,12 +164,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       if (audio && audio.paused) {
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch((err) => {
-            console.warn(
-              '[MediaSession] audio.play() caught, re-resolving:',
-              err,
-            );
-            void reResolveCurrentTrack(t);
+          playPromise.catch((err: Error) => {
+            if (err.name === 'AbortError') {
+              return;
+            }
+            console.warn('[MediaSession] audio.play() caught:', err);
           });
         }
       }
@@ -196,6 +197,16 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         audio.loop = false;
       }
 
+      const queue = useQueueStore.getState();
+      if (queue.items.length <= 1) {
+        const favTracks = useFavoritesStore
+          .getState()
+          .tracks.map((e: { ref: Track }) => e.ref);
+        if (favTracks.length > 0) {
+          queue.addToQueue(favTracks);
+        }
+      }
+
       navigator.mediaSession.playbackState = 'playing';
       useSoundStore.getState().play();
       useQueueStore.getState().goToPrevious();
@@ -205,6 +216,16 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       const audio = document.querySelector('audio');
       if (audio) {
         audio.loop = false;
+      }
+
+      const queue = useQueueStore.getState();
+      if (queue.items.length <= 1) {
+        const favTracks = useFavoritesStore
+          .getState()
+          .tracks.map((e: { ref: Track }) => e.ref);
+        if (favTracks.length > 0) {
+          queue.addToQueue(favTracks);
+        }
       }
 
       navigator.mediaSession.playbackState = 'playing';
@@ -217,19 +238,13 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('previoustrack', handlePrevious);
     registerHandler('nexttrack', handleNext);
 
-    registerHandler('seekbackward', handlePrevious);
-    registerHandler('seekforward', handleNext);
-
-    registerHandler('seekto', (details: MediaSessionActionDetails) => {
-      if (details.seekTime !== undefined) {
-        const audio = document.querySelector('audio');
-        if (audio) {
-          audio.currentTime = details.seekTime;
-          syncPositionState(audio, audio.paused ? 0 : 1);
-        }
-        useSoundStore.getState().seekTo(details.seekTime);
-      }
-    });
+    // CRITICAL FOR IOS:
+    // Unregister seek handlers (null) so iOS MPRemoteCommandCenter disables
+    // SkipForwardCommand/SkipBackwardCommand (+10s / -10s) and enables
+    // NextTrackCommand/PreviousTrackCommand (>>| and |<<) to change entire songs.
+    registerHandler('seekbackward', null);
+    registerHandler('seekforward', null);
+    registerHandler('seekto', null);
 
     registerHandler('stop', () => {
       const audio = document.querySelector('audio');
