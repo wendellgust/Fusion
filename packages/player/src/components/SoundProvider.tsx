@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { isIOSDevice, Sound, Volume } from '@nuclearplayer/hifi';
 import { useTranslation } from '@nuclearplayer/i18n';
+import type { Track } from '@nuclearplayer/model';
 
 import { useCoreSetting } from '../hooks/useCoreSetting';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../hooks/useStreamResolution';
 import { eventBus } from '../services/eventBus';
 import { Logger } from '../services/logger';
+import { useFavoritesStore } from '../stores/favoritesStore';
 import { useQueueStore } from '../stores/queueStore';
 import { useSoundStore } from '../stores/soundStore';
 import { useVisualizerStore } from '../stores/visualizerStore';
@@ -160,6 +162,19 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     const handlePlay = () => {
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
+        const currentPos = audio.currentTime;
+        const currentSrc = useSoundStore.getState().src?.url;
+
+        // If connection dropped during pause, reload src at current position:
+        if (audio.error || audio.networkState === 3 || audio.readyState < 2) {
+          if (currentSrc) {
+            audio.src = currentSrc;
+            if (currentPos > 0 && isFinite(currentPos)) {
+              audio.currentTime = currentPos;
+            }
+          }
+        }
+
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
           playPromise.catch((err) => {
@@ -196,6 +211,16 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         audio.loop = false;
       }
 
+      const queue = useQueueStore.getState();
+      if (queue.items.length <= 1) {
+        const favTracks = useFavoritesStore
+          .getState()
+          .tracks.map((e: { ref: Track }) => e.ref);
+        if (favTracks.length > 0) {
+          queue.addToQueue(favTracks);
+        }
+      }
+
       navigator.mediaSession.playbackState = 'playing';
       useSoundStore.getState().play();
       useQueueStore.getState().goToPrevious();
@@ -205,6 +230,16 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       const audio = document.querySelector('audio');
       if (audio) {
         audio.loop = false;
+      }
+
+      const queue = useQueueStore.getState();
+      if (queue.items.length <= 1) {
+        const favTracks = useFavoritesStore
+          .getState()
+          .tracks.map((e: { ref: Track }) => e.ref);
+        if (favTracks.length > 0) {
+          queue.addToQueue(favTracks);
+        }
       }
 
       navigator.mediaSession.playbackState = 'playing';
@@ -217,23 +252,13 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('previoustrack', handlePrevious);
     registerHandler('nexttrack', handleNext);
 
-    // Map seekbackward and seekforward to song track skipping!
-    // On iOS Lock Screen, Safari defaults to displaying 10s/15s curved buttons.
-    // By intercepting seekforward and seekbackward here and routing them to handleNext and handlePrevious,
-    // tapping the 10s button will ALWAYS skip to the next complete song instead of seeking 10 seconds!
-    registerHandler('seekbackward', handlePrevious);
-    registerHandler('seekforward', handleNext);
-
-    registerHandler('seekto', (details: MediaSessionActionDetails) => {
-      if (details.seekTime !== undefined) {
-        const audio = document.querySelector('audio');
-        if (audio) {
-          audio.currentTime = details.seekTime;
-          syncPositionState(audio, audio.paused ? 0 : 1);
-        }
-        useSoundStore.getState().seekTo(details.seekTime);
-      }
-    });
+    // CRITICAL FOR IOS:
+    // Explicitly unregister seek actions so iOS MPRemoteCommandCenter
+    // disables SkipForwardCommand and SkipBackwardCommand, forcing
+    // iOS Lock Screen and Control Center to show Next Track (>>|) and Previous Track (|<<)!
+    registerHandler('seekbackward', null);
+    registerHandler('seekforward', null);
+    registerHandler('seekto', null);
 
     registerHandler('stop', () => {
       const audio = document.querySelector('audio');

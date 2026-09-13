@@ -1,4 +1,4 @@
-import { Battery, ChevronRight, Pause, Play, X } from 'lucide-react';
+import { ChevronRight, Pause, Play, X, Zap } from 'lucide-react';
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useFavoritesStore } from '../../stores/favoritesStore';
@@ -49,9 +49,35 @@ const playIpodClick = () => {
   }
 };
 
+const triggerHaptic = () => {
+  try {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(10);
+    }
+  } catch {
+    // ignore
+  }
+};
+
+interface BatteryManager {
+  level: number;
+  charging: boolean;
+  addEventListener: (type: string, listener: () => void) => void;
+  removeEventListener: (type: string, listener: () => void) => void;
+}
+
 export const IpodClassicModal: FC = () => {
-  const { isOpen, close, theme, setTheme, soundEnabled, toggleSound } =
-    useIpodClassicStore();
+  const {
+    isOpen,
+    close,
+    theme,
+    setTheme,
+    soundEnabled,
+    toggleSound,
+    vibrationEnabled,
+    toggleVibration,
+  } = useIpodClassicStore();
+
   const currentItem = useQueueStore((s) => s.getCurrentItem());
   const queueItems = useQueueStore((s) => s.items);
   const queueIndex = useQueueStore((s) => s.currentIndex);
@@ -71,6 +97,27 @@ export const IpodClassicModal: FC = () => {
   const [currentView, setCurrentView] = useState<ScreenView>('main');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
+  // Real device battery state
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [isCharging, setIsCharging] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
+      (navigator as unknown as { getBattery: () => Promise<BatteryManager> })
+        .getBattery()
+        .then((battery: BatteryManager) => {
+          const updateBattery = () => {
+            setBatteryLevel(Math.round(battery.level * 100));
+            setIsCharging(battery.charging);
+          };
+          updateBattery();
+          battery.addEventListener('levelchange', updateBattery);
+          battery.addEventListener('chargingchange', updateBattery);
+        })
+        .catch(() => {});
+    }
+  }, []);
+
   const track = currentItem?.track;
   const coverUrl = getTrackArtworkUrl(track);
 
@@ -89,11 +136,14 @@ export const IpodClassicModal: FC = () => {
 
   const remainingTime = duration && seek ? duration - seek : 0;
 
-  const playClick = useCallback(() => {
+  const provideFeedback = useCallback(() => {
     if (soundEnabled) {
       playIpodClick();
     }
-  }, [soundEnabled]);
+    if (vibrationEnabled) {
+      triggerHaptic();
+    }
+  }, [soundEnabled, vibrationEnabled]);
 
   // Main Menu Items
   const mainMenuItems = useMemo(() => {
@@ -125,12 +175,16 @@ export const IpodClassicModal: FC = () => {
         label: `Theme: ${theme === 'classic' ? 'Silver / White' : 'U2 / Black'}`,
       },
       {
+        id: 'vibration',
+        label: `Wheel Haptic Vibration: ${vibrationEnabled ? 'ON' : 'OFF'}`,
+      },
+      {
         id: 'sound',
-        label: `Click Wheel Sound: ${soundEnabled ? 'ON' : 'OFF'}`,
+        label: `Click Wheel Audio: ${soundEnabled ? 'ON' : 'OFF'}`,
       },
       { id: 'exit', label: 'Exit to Fusion Player' },
     ],
-    [theme, soundEnabled],
+    [theme, vibrationEnabled, soundEnabled],
   );
 
   const getActiveListLength = useCallback(() => {
@@ -166,7 +220,7 @@ export const IpodClassicModal: FC = () => {
       if (total === 0) {
         return;
       }
-      playClick();
+      provideFeedback();
       setSelectedIndex((prev) => {
         let next = prev + direction;
         if (next < 0) {
@@ -178,12 +232,12 @@ export const IpodClassicModal: FC = () => {
         return next;
       });
     },
-    [getActiveListLength, playClick],
+    [getActiveListLength, provideFeedback],
   );
 
   // Handle select button
   const handleSelect = useCallback(async () => {
-    playClick();
+    provideFeedback();
     if (currentView === 'main') {
       const selected = mainMenuItems[selectedIndex];
       if (!selected) {
@@ -269,6 +323,8 @@ export const IpodClassicModal: FC = () => {
       }
       if (selected.id === 'theme') {
         setTheme(theme === 'classic' ? 'black' : 'classic');
+      } else if (selected.id === 'vibration') {
+        toggleVibration();
       } else if (selected.id === 'sound') {
         toggleSound();
       } else if (selected.id === 'exit') {
@@ -289,9 +345,10 @@ export const IpodClassicModal: FC = () => {
     favoriteEntries,
     theme,
     setTheme,
+    toggleVibration,
     toggleSound,
     close,
-    playClick,
+    provideFeedback,
     goToIndex,
     play,
     toggle,
@@ -302,7 +359,7 @@ export const IpodClassicModal: FC = () => {
 
   // Handle Menu button (go back)
   const handleMenu = useCallback(() => {
-    playClick();
+    provideFeedback();
     if (currentView === 'nowPlaying') {
       setCurrentView('main');
       setSelectedIndex(0);
@@ -320,33 +377,33 @@ export const IpodClassicModal: FC = () => {
         setCurrentView('nowPlaying');
       }
     }
-  }, [currentView, track, playClick]);
+  }, [currentView, track, provideFeedback]);
 
   // Handle Previous button
   const handlePrevButton = useCallback(() => {
-    playClick();
+    provideFeedback();
     if (currentView === 'nowPlaying') {
       goToPrevious();
     } else {
       scrollSelection(-1);
     }
-  }, [currentView, goToPrevious, scrollSelection, playClick]);
+  }, [currentView, goToPrevious, scrollSelection, provideFeedback]);
 
   // Handle Next button
   const handleNextButton = useCallback(() => {
-    playClick();
+    provideFeedback();
     if (currentView === 'nowPlaying') {
       goToNext();
     } else {
       scrollSelection(1);
     }
-  }, [currentView, goToNext, scrollSelection, playClick]);
+  }, [currentView, goToNext, scrollSelection, provideFeedback]);
 
   // Handle Play/Pause button
   const handlePlayPause = useCallback(() => {
-    playClick();
+    provideFeedback();
     toggle();
-  }, [toggle, playClick]);
+  }, [toggle, provideFeedback]);
 
   // Rotary Click Wheel tracking
   const wheelRef = useRef<HTMLDivElement>(null);
@@ -404,7 +461,7 @@ export const IpodClassicModal: FC = () => {
         if (duration > 0) {
           const newTime = Math.max(0, Math.min(duration, seek + step * 5));
           seekTo(newTime);
-          playClick();
+          provideFeedback();
         }
       } else {
         scrollSelection(step as 1 | -1);
@@ -478,61 +535,94 @@ export const IpodClassicModal: FC = () => {
   const isClassicTheme = theme === 'classic';
 
   return (
-    <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 backdrop-blur-md duration-200 select-none md:p-6">
+    <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-2 backdrop-blur-md duration-200 select-none md:p-6">
       {/* iPod Chassis Container */}
       <div
-        className={`relative flex flex-col justify-between rounded-[40px] border shadow-2xl transition-all duration-300 ${
+        className={`relative flex flex-col justify-between rounded-[42px] border shadow-2xl transition-all duration-300 ${
           isClassicTheme
-            ? 'border-[#c8c8c8] bg-gradient-to-b from-[#f3f4f6] via-[#e5e7eb] to-[#d1d5db] text-slate-800'
-            : 'border-[#333333] bg-gradient-to-b from-[#222222] via-[#161616] to-[#0a0a0a] text-zinc-100'
+            ? 'border-[#c8c8c8] bg-gradient-to-b from-[#f8fafc] via-[#e2e8f0] to-[#cbd5e1] text-slate-800'
+            : 'border-[#2e2e2e] bg-gradient-to-b from-[#1c1c1c] via-[#121212] to-[#080808] text-zinc-100'
         }`}
         style={{
-          width: 'min(380px, 94vw)',
-          height: 'min(640px, 92vh)',
+          width: 'min(380px, 95vw)',
+          height: 'min(645px, 94vh)',
           boxShadow: isClassicTheme
-            ? '0 25px 50px -12px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.8), inset 0 -4px 8px rgba(0, 0, 0, 0.15)'
-            : '0 25px 50px -12px rgba(0, 0, 0, 0.9), inset 0 2px 3px rgba(255, 255, 255, 0.1), inset 0 -4px 10px rgba(0, 0, 0, 0.8)',
-          padding: '24px 20px',
+            ? '0 25px 60px -12px rgba(0, 0, 0, 0.45), inset 0 2px 5px rgba(255, 255, 255, 0.9), inset 0 -4px 8px rgba(0, 0, 0, 0.15)'
+            : '0 25px 60px -12px rgba(0, 0, 0, 0.95), inset 0 2px 3px rgba(255, 255, 255, 0.12), inset 0 -4px 10px rgba(0, 0, 0, 0.85)',
+          padding: '20px 18px 22px',
         }}
       >
-        {/* Top bar controls */}
-        <div className="absolute top-3 right-4 flex items-center gap-2">
-          <button
-            onClick={() => setTheme(isClassicTheme ? 'black' : 'classic')}
-            className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition-colors ${
-              isClassicTheme
-                ? 'border-gray-400 bg-white/70 text-gray-700 hover:bg-white'
-                : 'border-zinc-700 bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700'
-            }`}
-            title="Toggle Silver / U2 Black Theme"
-          >
-            {isClassicTheme ? 'Silver' : 'Black'}
-          </button>
-          <button
-            onClick={close}
-            className={`flex size-6 items-center justify-center rounded-full transition-colors ${
-              isClassicTheme
-                ? 'text-gray-600 hover:bg-black/10'
-                : 'text-zinc-400 hover:bg-white/10'
-            }`}
-            title="Close iPod"
-          >
-            <X size={16} />
-          </button>
+        {/* Top Hardware Bezel Controls: Dedicated Theme Switcher & Close */}
+        <div className="flex items-center justify-between px-1 pb-2">
+          {/* Physical Theme Toggle Switch Outside Click Wheel */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => {
+                provideFeedback();
+                setTheme(isClassicTheme ? 'black' : 'classic');
+              }}
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold shadow-sm transition-all active:scale-95 ${
+                isClassicTheme
+                  ? 'border-gray-300 bg-white/90 text-gray-800 hover:bg-white'
+                  : 'border-zinc-700 bg-zinc-800/90 text-zinc-200 hover:bg-zinc-700'
+              }`}
+              title="Mudar Tema (Silver / Black)"
+            >
+              <span
+                className="inline-block size-2.5 rounded-full border shadow-inner"
+                style={{
+                  backgroundColor: isClassicTheme ? '#f3f4f6' : '#18181b',
+                }}
+              />
+              <span>{isClassicTheme ? '⚪ Silver' : '⚫ U2 Black'}</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => {
+                provideFeedback();
+                toggleVibration();
+              }}
+              className={`rounded-full border px-2 py-1 text-[10px] font-bold transition-all active:scale-95 ${
+                vibrationEnabled
+                  ? isClassicTheme
+                    ? 'border-blue-400 bg-blue-100 text-blue-800'
+                    : 'border-blue-600 bg-blue-950 text-blue-300'
+                  : isClassicTheme
+                    ? 'border-gray-300 bg-white/60 text-gray-500'
+                    : 'border-zinc-800 bg-zinc-900 text-zinc-500'
+              }`}
+              title="Vibração / Haptics"
+            >
+              {vibrationEnabled ? '📳 Vibra: ON' : '📴 Vibra: OFF'}
+            </button>
+            <button
+              onClick={close}
+              className={`flex size-7 items-center justify-center rounded-full transition-colors active:scale-95 ${
+                isClassicTheme
+                  ? 'text-gray-600 hover:bg-black/10'
+                  : 'text-zinc-400 hover:bg-white/10'
+              }`}
+              title="Fechar iPod"
+            >
+              <X size={17} />
+            </button>
+          </div>
         </div>
 
         {/* 1. LCD Screen */}
         <div
-          className="relative mx-auto flex w-full flex-col overflow-hidden rounded-xl border border-[#9ca3af]/40 bg-[#f0f4f8] shadow-inner"
+          className="relative mx-auto flex w-full flex-col overflow-hidden rounded-xl border border-[#9ca3af]/50 bg-[#f0f4f8] shadow-inner"
           style={{
             height: '240px',
-            boxShadow: 'inset 0 2px 6px rgba(0, 0, 0, 0.35)',
+            boxShadow: 'inset 0 2px 7px rgba(0, 0, 0, 0.4)',
             fontFamily:
               '-apple-system, BlinkMacSystemFont, "Helvetica Neue", "Chicago", sans-serif',
           }}
         >
-          {/* LCD Header Bar */}
-          <div className="flex h-6 w-full shrink-0 items-center justify-between border-b border-[#cbd5e1] bg-gradient-to-b from-[#e2e8f0] via-[#cbd5e1] to-[#94a3b8] px-2.5 text-[11px] font-bold text-[#1e293b]">
+          {/* LCD Header Bar with Real Battery */}
+          <div className="flex h-6 w-full shrink-0 items-center justify-between border-b border-[#cbd5e1] bg-gradient-to-b from-[#e2e8f0] via-[#cbd5e1] to-[#94a3b8] px-2 text-[11px] font-bold text-[#1e293b]">
             <div className="flex min-w-0 items-center gap-1">
               <span className="truncate">
                 {currentView === 'main'
@@ -550,13 +640,40 @@ export const IpodClassicModal: FC = () => {
                             : 'Music'}
               </span>
             </div>
+
             <div className="flex items-center gap-1.5">
               {isPlaying ? (
                 <Play size={9} fill="currentColor" />
               ) : (
                 <Pause size={9} fill="currentColor" />
               )}
-              <Battery size={13} />
+
+              {/* Real Phone Battery Indicator */}
+              <div className="flex items-center gap-0.5 text-[10px] font-semibold text-[#1e293b]">
+                {isCharging && (
+                  <Zap size={10} className="fill-amber-500 text-amber-600" />
+                )}
+                {batteryLevel !== null && <span>{batteryLevel}%</span>}
+                <div className="relative flex items-center">
+                  {/* Battery Body */}
+                  <div className="relative h-2.5 w-4 rounded-[2px] border border-[#1e293b] bg-white/40 p-[1px]">
+                    <div
+                      className={`h-full rounded-[1px] transition-all duration-300 ${
+                        (batteryLevel ?? 100) <= 20
+                          ? 'bg-red-500'
+                          : isCharging
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-600'
+                      }`}
+                      style={{
+                        width: `${Math.min(100, Math.max(10, batteryLevel ?? 100))}%`,
+                      }}
+                    />
+                  </div>
+                  {/* Battery Positive Terminal Tip */}
+                  <div className="h-1.5 w-[2px] rounded-r-[1px] bg-[#1e293b]" />
+                </div>
+              </div>
             </div>
           </div>
 
