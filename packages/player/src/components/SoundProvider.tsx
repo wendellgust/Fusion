@@ -160,30 +160,10 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     const handlePlay = () => {
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
-        const currentPos = audio.currentTime;
-        const currentSrc = useSoundStore.getState().src?.url;
-
-        // If connection dropped during pause, reload src at current position:
-        if (audio.error || audio.networkState === 3 || audio.readyState < 2) {
-          if (currentSrc) {
-            audio.src = currentSrc;
-            if (currentPos > 0 && isFinite(currentPos)) {
-              audio.currentTime = currentPos;
-            }
-          }
-        }
-
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
           playPromise.catch((err: Error) => {
-            console.warn(
-              '[MediaSession] audio.play() caught, re-resolving:',
-              err,
-            );
-            if (currentPos > 1 && isFinite(currentPos)) {
-              pendingSeekRef.current = currentPos;
-            }
-            void reResolveCurrentTrack(tRef.current);
+            console.warn('[MediaSession] audio.play() caught:', err);
           });
         }
       }

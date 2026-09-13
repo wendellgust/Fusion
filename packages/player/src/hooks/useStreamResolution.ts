@@ -521,7 +521,6 @@ export const reResolveCurrentTrack = async (t: TFunction): Promise<void> => {
   streamResolutionCache.delete(currentItem.id);
 
   const { setSrc, play } = useSoundStore.getState();
-  setSrc(null);
 
   activeMainController?.abort();
   activeMainController = new AbortController();
