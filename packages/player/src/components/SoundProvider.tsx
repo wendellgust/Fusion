@@ -164,7 +164,33 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       }
     };
 
+    const startSilentKeeper = () => {
+      if (!isIOSDevice()) {
+        return;
+      }
+      const silentEl = document.getElementById(
+        'fusion-silent-keeper',
+      ) as HTMLAudioElement | null;
+      if (silentEl && silentEl.paused) {
+        silentEl.currentTime = 0;
+        silentEl.play().catch(() => {});
+      }
+    };
+
+    const stopSilentKeeper = () => {
+      if (!isIOSDevice()) {
+        return;
+      }
+      const silentEl = document.getElementById(
+        'fusion-silent-keeper',
+      ) as HTMLAudioElement | null;
+      if (silentEl && !silentEl.paused) {
+        silentEl.pause();
+      }
+    };
+
     const handlePlay = () => {
+      stopSilentKeeper();
       const audio = document.querySelector('audio');
       const pausedMs =
         lastPauseTimeRef.current > 0
@@ -219,6 +245,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       if (audio && !audio.paused) {
         audio.pause();
       }
+      startSilentKeeper();
       navigator.mediaSession.playbackState = 'paused';
       if (audio) {
         syncPositionState(audio, 0);
@@ -227,6 +254,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     };
 
     const handlePrevious = () => {
+      stopSilentKeeper();
       const audio = document.querySelector('audio');
       if (audio) {
         audio.loop = false;
@@ -248,6 +276,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     };
 
     const handleNext = () => {
+      stopSilentKeeper();
       const audio = document.querySelector('audio');
       if (audio) {
         audio.loop = false;
@@ -282,6 +311,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('seekto', null);
 
     registerHandler('stop', () => {
+      stopSilentKeeper();
       const audio = document.querySelector('audio');
       if (audio) {
         audio.pause();
@@ -332,6 +362,22 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
           : status === 'paused'
             ? 'paused'
             : 'none';
+    }
+
+    if (isIOSDevice()) {
+      const silentEl = document.getElementById(
+        'fusion-silent-keeper',
+      ) as HTMLAudioElement | null;
+      if (status === 'paused') {
+        if (silentEl && silentEl.paused) {
+          silentEl.currentTime = 0;
+          silentEl.play().catch(() => {});
+        }
+      } else if (status === 'playing') {
+        if (silentEl && !silentEl.paused) {
+          silentEl.pause();
+        }
+      }
     }
 
     const currentItem = useQueueStore.getState().getCurrentItem();
@@ -588,6 +634,24 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
         <Volume value={volumePercent} />
         <VisualizerAnalyser />
       </Sound>
+      {isIOSDevice() && (
+        <audio
+          id="fusion-silent-keeper"
+          playsInline
+          loop
+          preload="auto"
+          src="/api/silent.wav"
+          style={{
+            position: 'fixed',
+            top: '-9999px',
+            left: '-9999px',
+            width: '1px',
+            height: '1px',
+            opacity: 0.001,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {children}
     </>
   );
