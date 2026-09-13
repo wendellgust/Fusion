@@ -6,6 +6,7 @@ import { Button, PlayerBar } from '@nuclearplayer/ui';
 import { useQueueStore } from '../../stores/queueStore';
 import { useSoundStore } from '../../stores/soundStore';
 import { getTrackArtworkUrl } from '../../utils/artworkHelper';
+import { IpodButton } from '../IpodClassic';
 import { ConnectedControls } from './ConnectedControls';
 import { ConnectedNowPlaying } from './ConnectedNowPlaying';
 import { ConnectedSeekBar } from './ConnectedSeekBar';
@@ -46,6 +47,7 @@ export const ConnectedPlayerBar: FC = () => {
           center={<ConnectedControls />}
           right={
             <div className="flex items-center gap-3">
+              <IpodButton />
               <VisualizerButton />
               <ConnectedVolume />
             </div>
@@ -88,6 +90,7 @@ export const ConnectedPlayerBar: FC = () => {
             className="flex items-center gap-1"
             onClick={(e) => e.stopPropagation()}
           >
+            <IpodButton />
             <Button size="icon" variant="text" onClick={toggle}>
               {isPlaying ? <Pause size={20} /> : <Play size={20} />}
             </Button>

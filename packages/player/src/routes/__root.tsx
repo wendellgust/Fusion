@@ -33,6 +33,7 @@ import { ConnectedSettingsModal } from '../components/ConnectedSettingsModal';
 import { ConnectedTopBar } from '../components/ConnectedTopBar';
 import { DevTools } from '../components/DevTools';
 import { FlatpakWarningBanner } from '../components/FlatpakWarningBanner';
+import { IpodClassicModal } from '../components/IpodClassic';
 import { LyricsPanel } from '../components/LyricsPanel';
 import { PomodoroTimer } from '../components/PomodoroTimer';
 import { SoundProvider } from '../components/SoundProvider';
@@ -188,6 +189,7 @@ const RootComponent = () => {
       <ConnectedPlayerBar />
       <Toaster />
       <ConnectedSettingsModal />
+      <IpodClassicModal />
       <DevTools />
     </PlayerShell>
   );

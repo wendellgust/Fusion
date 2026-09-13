@@ -160,18 +160,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     const handlePlay = () => {
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
-        // Proxied YouTube streams die after a few seconds of pause.
-        // We MUST reload the stream to reconnect. Save position first.
-        const savedTime = audio.currentTime;
-        audio.load();
-        if (savedTime > 0 && isFinite(savedTime)) {
-          audio.currentTime = savedTime;
-        }
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
           playPromise.catch((err) => {
             console.warn(
-              '[MediaSession] audio.play() reload caught, re-resolving:',
+              '[MediaSession] audio.play() caught, re-resolving:',
               err,
             );
             void reResolveCurrentTrack(t);
@@ -201,12 +194,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       const audio = document.querySelector('audio');
       if (audio) {
         audio.loop = false;
-        if (audio.currentTime > 3) {
-          audio.currentTime = 0;
-          useSoundStore.getState().seekTo(0);
-          useSoundStore.getState().play();
-          return;
-        }
       }
 
       navigator.mediaSession.playbackState = 'playing';

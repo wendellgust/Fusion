@@ -18,6 +18,7 @@ import { useFavoritesStore } from '../../stores/favoritesStore';
 import { useQueueStore } from '../../stores/queueStore';
 import { useSoundStore } from '../../stores/soundStore';
 import { getTrackArtworkUrl } from '../../utils/artworkHelper';
+import { IpodButton } from '../IpodClassic';
 
 type MobilePlayerModalProps = {
   isOpen: boolean;
@@ -101,16 +102,19 @@ export const MobilePlayerModal: FC<MobilePlayerModalProps> = ({
             {artistName}
           </div>
         </div>
-        <Link to="/visualizer" onClick={onClose}>
-          <Button
-            size="icon"
-            variant="text"
-            className="text-primary hover:text-foreground"
-            aria-label="Visualizer"
-          >
-            <Activity size={22} />
-          </Button>
-        </Link>
+        <div className="flex items-center gap-1">
+          <IpodButton />
+          <Link to="/visualizer" onClick={onClose}>
+            <Button
+              size="icon"
+              variant="text"
+              className="text-primary hover:text-foreground"
+              aria-label="Visualizer"
+            >
+              <Activity size={22} />
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Album Artwork */}
