@@ -6,10 +6,7 @@ import { useTranslation } from '@nuclearplayer/i18n';
 import type { Track } from '@nuclearplayer/model';
 
 import { useCoreSetting } from '../hooks/useCoreSetting';
-import {
-  handleCurrentTrackFailure,
-  reResolveCurrentTrack,
-} from '../hooks/useStreamResolution';
+import { reResolveCurrentTrack } from '../hooks/useStreamResolution';
 import { eventBus } from '../services/eventBus';
 import { Logger } from '../services/logger';
 import { useFavoritesStore } from '../stores/favoritesStore';
@@ -17,7 +14,6 @@ import { useQueueStore } from '../stores/queueStore';
 import { useSoundStore } from '../stores/soundStore';
 import { useVisualizerStore } from '../stores/visualizerStore';
 import { getTrackArtworkUrl } from '../utils/artworkHelper';
-import { resolveErrorMessage } from '../utils/logging';
 import { VisualizerAnalyser } from './VisualizerAnalyser';
 
 export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
@@ -451,40 +447,24 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       if (!currentSrc || currentSrc.startsWith('data:audio')) {
         return;
       }
-      if (
-        error.message === 'stream:expired' ||
-        audioElement?.error !== null ||
-        (status === 'playing' && audioElement?.networkState === 3)
-      ) {
-        const savedTime = audioElement?.currentTime ?? 0;
-        pendingSeekRef.current = savedTime > 1 ? savedTime : null;
-        void reResolveCurrentTrack(t);
-        return;
-      }
-
-      const message = resolveErrorMessage(error);
-      Logger.streaming.error(`Playback error: ${message}`);
-
-      if (!src || status === 'stopped') {
-        return;
+      const savedTime =
+        audioElement?.currentTime ?? useSoundStore.getState().seek ?? 0;
+      if (savedTime > 1 && isFinite(savedTime)) {
+        pendingSeekRef.current = savedTime;
       }
 
       const now = Date.now();
-      if (now - lastFailureTimeRef.current < 1500) {
+      if (now - lastFailureTimeRef.current < 2000) {
         return;
       }
       lastFailureTimeRef.current = now;
 
-      const currentItem = useQueueStore.getState().getCurrentItem();
-      if (currentItem) {
-        useQueueStore
-          .getState()
-          .updateItemState(currentItem.id, { status: 'error', error: message });
-      }
-
-      handleCurrentTrackFailure(t);
+      Logger.streaming.warn(
+        `Playback error (${error.message}). Attempting stream recovery...`,
+      );
+      void reResolveCurrentTrack(t);
     },
-    [audioElement, src, status, t],
+    [audioElement, t],
   );
 
   const handleAudioElement = useCallback((el: HTMLAudioElement | null) => {
