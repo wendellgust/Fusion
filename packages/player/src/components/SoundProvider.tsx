@@ -31,7 +31,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   );
   const pendingSeekRef = useRef<number | null>(null);
   const lastFailureTimeRef = useRef<number>(0);
-  const lastPauseTimeRef = useRef<number>(0);
   const setAnalyser = useVisualizerStore((state) => state.setAnalyser);
   const preload: HTMLAudioElement['preload'] = 'auto';
   const crossOrigin = 'anonymous' as const;
@@ -125,12 +124,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     }
   }, [crossfadeMs]);
 
-  useEffect(() => {
-    if (status === 'paused') {
-      lastPauseTimeRef.current = Date.now();
-    }
-  }, [status]);
-
   const syncPositionState = useCallback(
     (audio: HTMLAudioElement, rate: number) => {
       if (
@@ -170,28 +163,18 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
     const handlePlay = () => {
       const audio = document.querySelector('audio');
-      const currentPos = audio?.currentTime ?? 0;
-      const pausedDuration =
-        lastPauseTimeRef.current > 0
-          ? Date.now() - lastPauseTimeRef.current
-          : 0;
-
-      lastPauseTimeRef.current = 0;
-
       if (audio && audio.paused) {
-        // If paused for more than 20s or audio state dropped in background:
-        if (
-          pausedDuration > 20000 ||
-          audio.error !== null ||
-          audio.networkState === 3 ||
-          audio.readyState < 2
-        ) {
-          if (currentPos > 1 && isFinite(currentPos)) {
-            pendingSeekRef.current = currentPos;
+        const currentPos = audio.currentTime;
+        const currentSrc = useSoundStore.getState().src?.url;
+
+        // If connection dropped during pause, reload src at current position:
+        if (audio.error || audio.networkState === 3 || audio.readyState < 2) {
+          if (currentSrc) {
+            audio.src = currentSrc;
+            if (currentPos > 0 && isFinite(currentPos)) {
+              audio.currentTime = currentPos;
+            }
           }
-          navigator.mediaSession.playbackState = 'playing';
-          void reResolveCurrentTrack(tRef.current);
-          return;
         }
 
         const playPromise = audio.play();
@@ -204,7 +187,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
             if (currentPos > 1 && isFinite(currentPos)) {
               pendingSeekRef.current = currentPos;
             }
-            navigator.mediaSession.playbackState = 'playing';
             void reResolveCurrentTrack(tRef.current);
           });
         }
@@ -218,7 +200,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     };
 
     const handlePause = () => {
-      lastPauseTimeRef.current = Date.now();
       const audio = document.querySelector('audio');
       if (audio && !audio.paused) {
         audio.pause();
