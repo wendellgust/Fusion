@@ -164,13 +164,52 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     const handlePlay = () => {
       const audio = document.querySelector('audio');
       if (audio && audio.paused) {
-        if (audio.currentTime > 0 && isFinite(audio.currentTime)) {
-          try {
-            audio.currentTime = Math.max(0, audio.currentTime);
-          } catch {
-            // ignore
+        const currentPos = audio.currentTime;
+        const currentSrc = useSoundStore.getState().src?.url;
+
+        let hasBufferAhead = false;
+        try {
+          for (let i = 0; i < audio.buffered.length; i++) {
+            if (
+              audio.buffered.start(i) <= currentPos &&
+              audio.buffered.end(i) > currentPos + 0.5
+            ) {
+              hasBufferAhead = true;
+              break;
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        const needsReload =
+          audio.error !== null ||
+          audio.networkState === 3 ||
+          audio.readyState < 2 ||
+          !hasBufferAhead;
+
+        if (needsReload && currentSrc) {
+          audio.src = currentSrc;
+          if (currentPos > 0 && isFinite(currentPos)) {
+            try {
+              audio.currentTime = currentPos;
+            } catch {
+              // ignore
+            }
+            audio.addEventListener(
+              'loadedmetadata',
+              () => {
+                try {
+                  audio.currentTime = currentPos;
+                } catch {
+                  // ignore
+                }
+              },
+              { once: true },
+            );
           }
         }
+
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
           playPromise.catch((err: Error) => {
@@ -178,6 +217,28 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
               return;
             }
             console.warn('[MediaSession] audio.play() caught:', err);
+            if (currentSrc) {
+              audio.src = currentSrc;
+              if (currentPos > 0 && isFinite(currentPos)) {
+                try {
+                  audio.currentTime = currentPos;
+                } catch {
+                  // ignore
+                }
+                audio.addEventListener(
+                  'loadedmetadata',
+                  () => {
+                    try {
+                      audio.currentTime = currentPos;
+                    } catch {
+                      // ignore
+                    }
+                  },
+                  { once: true },
+                );
+              }
+              audio.play().catch(() => {});
+            }
           });
         }
       }
