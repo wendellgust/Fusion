@@ -122,7 +122,8 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     }
   }, [crossfadeMs]);
 
-  const syncMediaSessionHandlers = useCallback(() => {
+  // Core handlers registered permanently so iOS never loses background callback references
+  useEffect(() => {
     if (typeof window === 'undefined' || !('mediaSession' in navigator)) {
       return;
     }
@@ -158,7 +159,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
     const handlePlay = () => {
       const audio = document.querySelector('audio');
-      if (audio && audio.paused) {
+      if (audio) {
         const currentPos = audio.currentTime;
         const currentSrc = useSoundStore.getState().src?.url;
 
@@ -167,7 +168,11 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
           if (currentSrc) {
             audio.src = currentSrc;
             if (currentPos > 0 && isFinite(currentPos)) {
-              audio.currentTime = currentPos;
+              try {
+                audio.currentTime = currentPos;
+              } catch {
+                // ignore
+              }
             }
           }
         }
@@ -248,11 +253,6 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     registerHandler('pause', handlePause);
     registerHandler('previoustrack', handlePrevious);
     registerHandler('nexttrack', handleNext);
-
-    // CRITICAL FOR IOS:
-    // Explicitly unregister seek actions so iOS MPRemoteCommandCenter
-    // disables SkipForwardCommand and SkipBackwardCommand, forcing
-    // iOS Lock Screen and Control Center to show Next Track (>>|) and Previous Track (|<<)!
     registerHandler('seekbackward', null);
     registerHandler('seekforward', null);
 
@@ -278,46 +278,101 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     });
   }, [t]);
 
-  // Initial registration
-  useEffect(() => {
-    syncMediaSessionHandlers();
-  }, [syncMediaSessionHandlers]);
+  // Assert track-skip shape (>>| and |<<) on audio events
+  const assertTrackControls = useCallback(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) {
+      return;
+    }
 
-  // Hook into audioElement events to continuously re-assert handlers when playback starts or changes
+    const ms = navigator.mediaSession;
+    try {
+      const handlePrevious = () => {
+        const audio = document.querySelector('audio');
+        if (audio) {
+          audio.loop = false;
+        }
+
+        const queue = useQueueStore.getState();
+        if (queue.items.length <= 1) {
+          const favTracks = useFavoritesStore
+            .getState()
+            .tracks.map((e: { ref: Track }) => e.ref);
+          if (favTracks.length > 0) {
+            queue.addToQueue(favTracks);
+          }
+        }
+
+        ms.playbackState = 'playing';
+        useSoundStore.getState().play();
+        useQueueStore.getState().goToPrevious();
+      };
+
+      const handleNext = () => {
+        const audio = document.querySelector('audio');
+        if (audio) {
+          audio.loop = false;
+        }
+
+        const queue = useQueueStore.getState();
+        if (queue.items.length <= 1) {
+          const favTracks = useFavoritesStore
+            .getState()
+            .tracks.map((e: { ref: Track }) => e.ref);
+          if (favTracks.length > 0) {
+            queue.addToQueue(favTracks);
+          }
+        }
+
+        ms.playbackState = 'playing';
+        useSoundStore.getState().play();
+        useQueueStore.getState().goToNext();
+      };
+
+      ms.setActionHandler('previoustrack', handlePrevious);
+      ms.setActionHandler('nexttrack', handleNext);
+      ms.setActionHandler('seekbackward', null);
+      ms.setActionHandler('seekforward', null);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Hook into audioElement events when playback begins
   useEffect(() => {
     if (!audioElement) {
       return;
     }
 
     const onMediaEvent = () => {
-      syncMediaSessionHandlers();
+      assertTrackControls();
     };
 
     audioElement.addEventListener('play', onMediaEvent);
     audioElement.addEventListener('playing', onMediaEvent);
-    audioElement.addEventListener('canplay', onMediaEvent);
-    audioElement.addEventListener('loadedmetadata', onMediaEvent);
 
     return () => {
       audioElement.removeEventListener('play', onMediaEvent);
       audioElement.removeEventListener('playing', onMediaEvent);
-      audioElement.removeEventListener('canplay', onMediaEvent);
-      audioElement.removeEventListener('loadedmetadata', onMediaEvent);
     };
-  }, [audioElement, syncMediaSessionHandlers]);
+  }, [audioElement, assertTrackControls]);
 
-  // Periodic heartbeat every 2s to heal any WebKit GPU process reset
+  // Periodic assertion ONLY while playing (NEVER when paused, to preserve background pause/resume!)
   useEffect(() => {
-    if (typeof window === 'undefined' || !('mediaSession' in navigator)) {
+    if (
+      status !== 'playing' ||
+      typeof window === 'undefined' ||
+      !('mediaSession' in navigator)
+    ) {
       return;
     }
 
+    assertTrackControls();
     const intervalId = setInterval(() => {
-      syncMediaSessionHandlers();
-    }, 2000);
+      assertTrackControls();
+    }, 3000);
 
     return () => clearInterval(intervalId);
-  }, [syncMediaSessionHandlers]);
+  }, [status, assertTrackControls]);
 
   // Sync playback state and metadata to lockscreen
   useEffect(() => {
@@ -380,8 +435,10 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
       }
     }
 
-    syncMediaSessionHandlers();
-  }, [src, status, syncMediaSessionHandlers]);
+    if (status === 'playing') {
+      assertTrackControls();
+    }
+  }, [src, status, assertTrackControls]);
 
   const handleTimeUpdate = useCallback(
     ({ position, duration }: { position: number; duration: number }) => {
