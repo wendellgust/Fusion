@@ -27,6 +27,7 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
   );
   const pendingSeekRef = useRef<number | null>(null);
   const lastFailureTimeRef = useRef<number>(0);
+  const lastPauseTimeRef = useRef<number>(0);
   const setAnalyser = useVisualizerStore((state) => state.setAnalyser);
   const preload: HTMLAudioElement['preload'] = 'auto';
   const crossOrigin = 'anonymous' as const;
@@ -120,6 +121,12 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     }
   }, [crossfadeMs]);
 
+  useEffect(() => {
+    if (status === 'paused' && lastPauseTimeRef.current === 0) {
+      lastPauseTimeRef.current = Date.now();
+    }
+  }, [status]);
+
   const syncPositionState = useCallback(
     (audio: HTMLAudioElement, rate: number) => {
       if (
@@ -159,8 +166,37 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
 
     const handlePlay = () => {
       const audio = document.querySelector('audio');
+      const pausedMs =
+        lastPauseTimeRef.current > 0
+          ? Date.now() - lastPauseTimeRef.current
+          : 0;
+      lastPauseTimeRef.current = 0;
+
+      const currentPos =
+        audio?.currentTime ?? useSoundStore.getState().seek ?? 0;
+
+      navigator.mediaSession.playbackState = 'playing';
+      if (audio) {
+        syncPositionState(audio, 1);
+      }
+      useSoundStore.getState().play();
+
+      if (
+        pausedMs > 20000 ||
+        audio?.error !== null ||
+        audio?.networkState === 3
+      ) {
+        if (currentPos > 0.5 && isFinite(currentPos)) {
+          pendingSeekRef.current = currentPos;
+        }
+        if (audio) {
+          audio.play().catch(() => {});
+        }
+        void reResolveCurrentTrack(tRef.current);
+        return;
+      }
+
       if (audio && audio.paused) {
-        const currentPos = audio.currentTime;
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
           playPromise.catch((err: Error) => {
@@ -175,15 +211,10 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
           });
         }
       }
-
-      navigator.mediaSession.playbackState = 'playing';
-      if (audio) {
-        syncPositionState(audio, 1);
-      }
-      useSoundStore.getState().play();
     };
 
     const handlePause = () => {
+      lastPauseTimeRef.current = Date.now();
       const audio = document.querySelector('audio');
       if (audio && !audio.paused) {
         audio.pause();
@@ -416,6 +447,14 @@ export const SoundProvider: FC<PropsWithChildren> = ({ children }) => {
     if (pendingSeekRef.current !== null) {
       const seekTarget = pendingSeekRef.current;
       pendingSeekRef.current = null;
+      const audio = audioElement || document.querySelector('audio');
+      if (audio) {
+        try {
+          audio.currentTime = seekTarget;
+        } catch {
+          // ignore
+        }
+      }
       useSoundStore.getState().seekTo(seekTarget);
       useSoundStore.getState().play();
       return;
